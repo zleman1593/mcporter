@@ -122,7 +122,13 @@ console.log(docs.markdown()); // markdown excerpt
 await runtime.close();
 ```
 
-Every property access maps from camelCase to the underlying tool name automatically (`resolveLibraryId` → `resolve-library-id`). Proxy methods return a `CallResult` wrapper with `.raw`, `.text()`, `.markdown()`, `.json()`, and other helpers so scripts stay terse. You can still drop down to `context7.call("resolve-library-id", { args: { ... } })` when you need explicit control.
+Every property access maps from camelCase to the underlying tool name automatically (`resolveLibraryId` → `resolve-library-id`). Beyond method names, the proxy:
+
+- merges JSON-schema defaults so you only specify overrides;
+- validates required arguments and throws helpful errors when fields are missing;
+- returns a `CallResult` wrapper with `.raw`, `.text()`, `.markdown()`, `.json()`, and other helpers for quick post-processing.
+
+You can still drop down to `context7.call("resolve-library-id", { args: { ... } })` when you need explicit control.
 
 ## Testing & CI
 
