@@ -1,4 +1,4 @@
-# mcporter 🔌
+# mcporter 🧳
 _TypeScript runtime + CLI generator for the Model Context Protocol._
 
 `mcporter` packages an ergonomic, composable toolkit that works equally well for command-line operators and long-running agents.
