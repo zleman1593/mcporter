@@ -14,8 +14,8 @@ import { loadServerDefinitions, type ServerDefinition } from "./config.js";
 import { resolveEnvPlaceholders, withEnvOverrides } from "./env.js";
 import { createOAuthSession, type OAuthSession } from "./oauth.js";
 
-const PACKAGE_NAME = "mcp-runtime";
-const CLIENT_VERSION = "0.2.0";
+const PACKAGE_NAME = "mcporter";
+const CLIENT_VERSION = "0.1.0";
 
 export interface RuntimeOptions {
 	readonly configPath?: string;
@@ -362,13 +362,13 @@ class McpRuntime implements Runtime {
 function createConsoleLogger(): RuntimeLogger {
 	return {
 		info: (message) => {
-			console.log(`[mcp-runtime] ${message}`);
+			console.log(`[mcporter] ${message}`);
 		},
 		warn: (message) => {
-			console.warn(`[mcp-runtime] ${message}`);
+			console.warn(`[mcporter] ${message}`);
 		},
 		error: (message, error) => {
-			console.error(`[mcp-runtime] ${message}`);
+			console.error(`[mcporter] ${message}`);
 			if (error) {
 				console.error(error);
 			}

@@ -1,23 +1,23 @@
 ---
-summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP helpers.'
+summary: 'Plan for the mcporter package replacing the Sweetistics pnpm MCP helpers.'
 ---
 
-# mcp-runtime Roadmap
+# mcporter Roadmap
 
 > Inspired in part by Anthropic’s guidance on MCP code execution agents: https://www.anthropic.com/engineering/code-execution-with-mcp
 
 ## Goals
-- Provide a TypeScript runtime + CLI that exposes all MCP servers defined in `~/Projects/sweetistics/config/mcp-runtime.json`.
-- Preserve current one-shot `pnpm mcp:call` ergonomics while enabling reusable connections for Bun/Node agents.
+- Provide a TypeScript runtime + CLI that exposes all MCP servers defined in `~/Projects/sweetistics/config/mcporter.json`.
+- Preserve current one-shot `pnpm mcporter:call` ergonomics while enabling reusable connections for Bun/Node agents.
 - Keep feature parity with the Python helper (env interpolation, stdio wrapping, OAuth caching) and extend test coverage.
 
 ## Deliverables
-- `packages/mcp-runtime` (standalone npm package) exporting:
+- `packages/mcporter` (standalone npm package) exporting:
   - `createRuntime()` for shared connections (list/call tools, resolve resources).
   - `callOnce()` convenience matching today’s single-call flow.
   - Typed utilities for env/header resolution and stdio command execution.
-- CLI entry point (`npx mcp-runtime list|call`) built on the same runtime.
-- CLI generator (`npx mcp-runtime generate-cli`) that emits standalone CLIs (plain TypeScript or bundled JS) with embedded schemas and Commander-based subcommands, targeting Node or Bun.
+- CLI entry point (`npx mcporter list|call`) built on the same runtime.
+- CLI generator (`npx mcporter generate-cli`) that emits standalone CLIs (plain TypeScript or bundled JS) with embedded schemas and Commander-based subcommands, targeting Node or Bun.
 - Test harness using the Sweetistics MCP fixtures to validate every configured server definition.
 - Documentation: README, usage examples, migration guide for replacing `pnpm mcp:*`.
 
@@ -26,14 +26,14 @@ summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP he
 - Reuse `@modelcontextprotocol/sdk` transports; wrap stdio via `scripts/mcp_stdio_wrapper.sh`.
 - Mirror Python helper behavior:
   - `${VAR}`, `${VAR:-default}`, `$env:VAR` interpolation.
-- Optional OAuth token cache directory handling (defaulting to `~/.mcp-runtime/<server>` when none is provided).
+- Optional OAuth token cache directory handling (defaulting to `~/.mcporter/<server>` when none is provided).
   - Tool signature + schema fetching for `list`.
 - Provide lazy connection pooling per server to minimize startup cost.
 - Expose a lightweight server proxy (`createServerProxy`) that maps camelCase method accesses to tool names, fills JSON-schema defaults, validates required arguments, and returns a helper (`CallResult`) for extracting text/markdown/JSON without re-parsing the content envelope.
-- Document Cursor-compatible `config/mcp-runtime.json` structure; support env-sourced headers and stdio commands while keeping inline overrides available for scripts.
+- Document Cursor-compatible `config/mcporter.json` structure; support env-sourced headers and stdio commands while keeping inline overrides available for scripts.
 
 ## Schema-Aware Proxy Strategy
-- Cache tool schemas on first access, persist them under `~/.mcp-runtime/<server>/schema.json` for reuse across processes, and tolerate failures by falling back to raw `callTool`.
+- Cache tool schemas on first access, persist them under `~/.mcporter/<server>/schema.json` for reuse across processes, and tolerate failures by falling back to raw `callTool`.
 - Allow direct method-style invocations such as `context7.getLibraryDocs("react")` by:
   - Mapping camelCase properties to kebab-case tool names.
   - Detecting positional arguments and assigning them to required schema fields in order.
@@ -52,7 +52,7 @@ summary: 'Plan for the mcp-runtime package replacing the Sweetistics pnpm MCP he
 - Add integration tests asserting the generated CLI can list tools, execute with positional/flag arguments, and hydrate cache files without additional list calls.
 
 ## Configuration
-- Single file `config/mcp-runtime.json` mirrors Cursor/Claude schema: `mcpServers` map with entries containing `baseUrl` or `command`+`args`, optional `headers`, `env`, `description`, `auth`, `tokenCacheDir`, and convenience `bearerToken`/`bearerTokenEnv` fields.
+- Single file `config/mcporter.json` mirrors Cursor/Claude schema: `mcpServers` map with entries containing `baseUrl` or `command`+`args`, optional `headers`, `env`, `description`, `auth`, `tokenCacheDir`, and convenience `bearerToken`/`bearerTokenEnv` fields.
 - Optional `imports` array (defaulting to ['cursor', 'claude-code', 'claude-desktop', 'codex']) controls auto-merging of editor configs; entries earlier in the list win conflicts while local definitions can still override.
 - Provide `configPath` override for scripts/tests; keep inline overrides in examples for completeness but default to file-based configuration.
 - Add fixtures validating HTTP vs. stdio normalization, header/env behavior, and editor config imports (Cursor, Claude Code/Desktop, Codex) to ensure priority ordering matches defaults.

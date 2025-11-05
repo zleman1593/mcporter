@@ -97,7 +97,7 @@ vi.mock("@modelcontextprotocol/sdk/client/auth.js", () => ({
 
 import { createRuntime } from "../src/runtime.js";
 
-describe("mcp-runtime composability", () => {
+describe("mcporter composability", () => {
 	beforeEach(() => {
 		mocks.connectMock.mockClear();
 		mocks.listToolsMock.mockReset();

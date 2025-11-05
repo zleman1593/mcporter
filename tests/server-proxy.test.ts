@@ -120,7 +120,7 @@ describe("createServerProxy", () => {
 
 	it("hydrates schemas from disk cache without querying the server", async () => {
 		const tmpDir = await fs.mkdtemp(
-			path.join(os.tmpdir(), "mcp-runtime-schema-cache-"),
+			path.join(os.tmpdir(), "mcporter-schema-cache-"),
 		);
 		try {
 			const definition: ServerDefinition = {
@@ -164,7 +164,7 @@ describe("createServerProxy", () => {
 
 	it("persists schemas to disk after fetching", async () => {
 		const tmpDir = await fs.mkdtemp(
-			path.join(os.tmpdir(), "mcp-runtime-schema-write-"),
+			path.join(os.tmpdir(), "mcporter-schema-write-"),
 		);
 		try {
 			const runtime = createMockRuntime(
@@ -202,7 +202,7 @@ describe("createServerProxy", () => {
 
 	it("uses provided initial schemas without hitting listTools", async () => {
 		const tmpDir = await fs.mkdtemp(
-			path.join(os.tmpdir(), "mcp-runtime-schema-initial-"),
+			path.join(os.tmpdir(), "mcporter-schema-initial-"),
 		);
 		try {
 			const runtime = createMockRuntime(
@@ -372,7 +372,7 @@ describe("createServerProxy", () => {
 
 		expect(runtime.callTool).toHaveBeenCalledWith(
 			"firecrawl",
-			"firecrawl-scrape",
+			"firecrawl_scrape",
 			{
 				args: {
 					url: "https://example.com/docs",

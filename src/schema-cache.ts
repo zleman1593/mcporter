@@ -13,7 +13,7 @@ export interface SchemaCacheSnapshot {
 export function resolveSchemaCacheDir(definition: ServerDefinition): string {
 	return (
 		definition.tokenCacheDir ??
-		path.join(os.homedir(), ".mcp-runtime", definition.name)
+		path.join(os.homedir(), ".mcporter", definition.name)
 	);
 }
 

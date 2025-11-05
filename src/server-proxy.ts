@@ -45,10 +45,11 @@ function defaultToolNameMapper(propertyKey: string | symbol): string {
 	if (typeof propertyKey !== "string") {
 		throw new TypeError("Tool name must be a string when using server proxy.");
 	}
-	return propertyKey
-		.replace(/_/g, "-")
-		.replace(/([a-z\d])([A-Z])/g, "$1-$2")
-		.toLowerCase();
+	return propertyKey.replace(/([a-z\d])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
+function canonicalizeToolName(name: string): string {
+	return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -167,6 +168,7 @@ export function createServerProxy(
 
 	const toolSchemaCache = new Map<string, ToolSchemaInfo>();
 	const persistedSchemas = new Map<string, Record<string, unknown>>();
+	const toolAliasMap = new Map<string, string>();
 	let schemaFetch: Promise<void> | null = null;
 	let diskLoad: Promise<void> | null = null;
 	let persistPromise: Promise<void> | null = null;
@@ -258,6 +260,14 @@ export function createServerProxy(
 		if (canonical !== key) {
 			toolSchemaCache.set(key, info);
 		}
+		const canonicalAlias = canonicalizeToolName(key);
+		if (!toolAliasMap.has(canonicalAlias)) {
+			toolAliasMap.set(canonicalAlias, key);
+		}
+		const mapperAlias = canonicalizeToolName(canonical);
+		if (!toolAliasMap.has(mapperAlias)) {
+			toolAliasMap.set(mapperAlias, key);
+		}
 		if (cacheSchemas && definitionForCache && isPlainObject(schemaRaw)) {
 			persistedSchemas.set(canonical, schemaRaw as Record<string, unknown>);
 		}
@@ -310,15 +320,33 @@ export function createServerProxy(
 			if (Reflect.has(target, property)) {
 				return Reflect.get(target, property, receiver);
 			}
-
-			const toolName = mapPropertyToTool(property);
+			const propertyKey = property;
+			const canonicalKey =
+				typeof propertyKey === "string"
+					? canonicalizeToolName(propertyKey)
+					: null;
+			let resolvedToolName =
+				typeof propertyKey === "string" && canonicalKey
+					? (toolAliasMap.get(canonicalKey) ?? mapPropertyToTool(propertyKey))
+					: mapPropertyToTool(propertyKey);
 
 			return async (...callArgs: unknown[]) => {
 				let schemaInfo: ToolSchemaInfo | undefined;
 				try {
-					schemaInfo = await ensureMetadata(toolName);
+					schemaInfo = await ensureMetadata(resolvedToolName);
 				} catch {
 					schemaInfo = undefined;
+				}
+				if (typeof propertyKey === "string" && canonicalKey) {
+					const alias = toolAliasMap.get(canonicalKey);
+					if (alias && alias !== resolvedToolName) {
+						resolvedToolName = alias;
+						try {
+							schemaInfo = await ensureMetadata(resolvedToolName);
+						} catch {
+							// ignore and keep prior schema if available
+						}
+					}
 				}
 
 				const positional: unknown[] = [];
@@ -359,7 +387,7 @@ export function createServerProxy(
 
 					if (positional.length > schema.orderedKeys.length) {
 						throw new Error(
-							`Too many positional arguments for tool "${toolName}"`,
+							`Too many positional arguments for tool "${resolvedToolName}"`,
 						);
 					}
 
@@ -413,7 +441,7 @@ export function createServerProxy(
 
 				const result = await runtime.callTool(
 					serverName,
-					toolName,
+					resolvedToolName,
 					finalOptions,
 				);
 				return createCallResult(result);

@@ -31,7 +31,7 @@ afterEach(() => {
 
 describe("config imports", () => {
 	it("merges external configs with first-wins precedence", async () => {
-		const configPath = path.join(FIXTURE_ROOT, "config", "mcp-runtime.json");
+		const configPath = path.join(FIXTURE_ROOT, "config", "mcporter.json");
 		const servers = await loadServerDefinitions({
 			configPath,
 			rootDir: FIXTURE_ROOT,

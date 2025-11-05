@@ -1,5 +1,5 @@
 ---
-summary: 'How to migrate from pnpm mcp:* wrappers to the mcp-runtime package.'
+summary: 'How to migrate from pnpm mcp:* wrappers to the mcporter package.'
 ---
 
 # Migration Guide
@@ -9,33 +9,33 @@ This guide walks through replacing the Python-based `pnpm mcp:*` helpers with th
 ## 1. Install
 
 ```bash
-pnpm add mcp-runtime
+pnpm add mcporter
 # or
-yarn add mcp-runtime
+yarn add mcporter
 # or
-npm install mcp-runtime
+npm install mcporter
 ```
 
 ## 2. Update Scripts
 
-- Replace `pnpm mcp:list` with `npx mcp-runtime list`.
-- Replace `pnpm mcp:call <server>.<tool> key=value` with `npx mcp-runtime call <server>.<tool> key=value`.
-- Add `--config <path>` if your configuration is not under `./config/mcp-runtime.json`.
-- Optional: set `"imports"` inside `mcp-runtime.json` (for example `[]` to disable auto-imports or `["cursor", "codex"]` to customize the order).
+- Replace `pnpm mcporter:list` with `npx mcporter list`.
+- Replace `pnpm mcporter:call <server>.<tool> key=value` with `npx mcporter call <server>.<tool> key=value`.
+- Add `--config <path>` if your configuration is not under `./config/mcporter.json`.
+- Optional: set `"imports"` inside `mcporter.json` (for example `[]` to disable auto-imports or `["cursor", "codex"]` to customize the order).
 - Append `--tail-log` to stream the last 20 lines of any log file returned by the tool.
 
 ## 3. OAuth Tokens
 
-- Tokens are saved under `~/.mcp-runtime/<server>/` by default.
+- Tokens are saved under `~/.mcporter/<server>/` by default.
 - To force a fresh login, delete that directory and rerun the command; the CLI will relaunch the browser.
-- Custom `token_cache_dir` entries in `mcp-runtime.json` continue to work as explicit overrides.
+- Custom `token_cache_dir` entries in `mcporter.json` continue to work as explicit overrides.
 
 ## 4. Programmatic Usage
 
 ```ts
-import { createRuntime } from "mcp-runtime";
+import { createRuntime } from "mcporter";
 
-const runtime = await createRuntime({ configPath: "./config/mcp-runtime.json" });
+const runtime = await createRuntime({ configPath: "./config/mcporter.json" });
 const tools = await runtime.listTools("chrome-devtools");
 await runtime.callTool("chrome-devtools", "take_screenshot", { args: { url: "https://x.com" } });
 await runtime.close();
@@ -46,7 +46,7 @@ Prefer `createRuntime` for long-lived agents so connections and OAuth tokens can
 ## 5. Single Call Helper
 
 ```ts
-import { callOnce } from "mcp-runtime";
+import { callOnce } from "mcporter";
 
 await callOnce({
   server: "firecrawl",
@@ -69,7 +69,7 @@ Use `callOnce` for fire-and-forget invocations.
 | --- | --- |
 | Browser did not open | Copy the printed OAuth URL manually into a browser. |
 | Authorization hangs | Ensure the callback URL can bind to `127.0.0.1`; firewalls may block it. |
-| Tokens are stale | Delete `~/.mcp-runtime/<server>/tokens.json` and retry. |
+| Tokens are stale | Delete `~/.mcporter/<server>/tokens.json` and retry. |
 | Stdio command fails | Pass `--root` to point at the repo root so relative paths resolve. |
 
 ---

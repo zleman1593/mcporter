@@ -37,6 +37,8 @@ const RawEntrySchema = z.object({
 	token_cache_dir: z.string().optional(),
 	clientName: z.string().optional(),
 	client_name: z.string().optional(),
+	oauthRedirectUrl: z.string().optional(),
+	oauth_redirect_url: z.string().optional(),
 	bearerToken: z.string().optional(),
 	bearer_token: z.string().optional(),
 	bearerTokenEnv: z.string().optional(),
@@ -71,6 +73,7 @@ export interface ServerDefinition {
 	readonly auth?: string;
 	readonly tokenCacheDir?: string;
 	readonly clientName?: string;
+	readonly oauthRedirectUrl?: string;
 }
 
 export interface LoadConfigOptions {
@@ -132,7 +135,7 @@ function resolveConfigPath(
 	if (configPath) {
 		return path.resolve(configPath);
 	}
-	return path.resolve(rootDir, "config", "mcp-runtime.json");
+	return path.resolve(rootDir, "config", "mcporter.json");
 }
 
 async function readConfigFile(configPath: string): Promise<RawConfig> {
@@ -150,6 +153,8 @@ function normalizeServerEntry(
 	const auth = normalizeAuth(raw.auth);
 	const tokenCacheDir = normalizePath(raw.tokenCacheDir ?? raw.token_cache_dir);
 	const clientName = raw.clientName ?? raw.client_name;
+	const oauthRedirectUrl =
+		raw.oauthRedirectUrl ?? raw.oauth_redirect_url ?? undefined;
 	const headers = buildHeaders(raw);
 
 	const httpUrl = getUrl(raw);
@@ -172,13 +177,13 @@ function normalizeServerEntry(
 		};
 	} else {
 		throw new Error(
-			`Server '${name}' is missing a baseUrl/url or command definition in mcp-runtime.json`,
+			`Server '${name}' is missing a baseUrl/url or command definition in mcporter.json`,
 		);
 	}
 
 	const resolvedTokenCacheDir =
 		auth === "oauth"
-			? path.join(os.homedir(), ".mcp-runtime", name)
+			? (tokenCacheDir ?? path.join(os.homedir(), ".mcporter", name))
 			: (tokenCacheDir ?? undefined);
 
 	return {
@@ -189,6 +194,7 @@ function normalizeServerEntry(
 		auth,
 		tokenCacheDir: resolvedTokenCacheDir,
 		clientName,
+		oauthRedirectUrl,
 	};
 }
 

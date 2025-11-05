@@ -478,7 +478,7 @@ function printHelp(message?: string): void {
 		console.error(message);
 		console.error("");
 	}
-	console.error(`Usage: mcp-runtime <command> [options]
+	console.error(`Usage: mcporter <command> [options]
 
 Commands:
   list [name] [--schema]             List configured MCP servers (and tools for a server)
@@ -487,7 +487,7 @@ Commands:
   generate-cli --server <ref>        Generate a standalone CLI for a server (supports --output, --bundle)
 
 Global flags:
-  --config <path>                    Path to mcp-runtime.json (defaults to ./config/mcp-runtime.json)
+  --config <path>                    Path to mcporter.json (defaults to ./config/mcporter.json)
   --root <path>                      Root directory for stdio command cwd
 `);
 }

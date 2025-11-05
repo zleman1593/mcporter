@@ -14,6 +14,7 @@ import type {
 import type { ServerDefinition } from "./config.js";
 
 const CALLBACK_HOST = "127.0.0.1";
+const CALLBACK_PATH = "/callback";
 
 interface Deferred<T> {
 	promise: Promise<T>;
@@ -103,7 +104,7 @@ class FileOAuthClientProvider implements OAuthClientProvider {
 		this.redirectUrlValue = redirectUrl;
 		this.logger = logger;
 		this.metadata = {
-			client_name: definition.clientName ?? `mcp-runtime (${definition.name})`,
+			client_name: definition.clientName ?? `mcporter (${definition.name})`,
 			redirect_uris: [this.redirectUrlValue.toString()],
 			grant_types: ["authorization_code", "refresh_token"],
 			response_types: ["code"],
@@ -121,12 +122,23 @@ class FileOAuthClientProvider implements OAuthClientProvider {
 	}> {
 		const tokenDir =
 			definition.tokenCacheDir ??
-			path.join(os.homedir(), ".mcp-runtime", definition.name);
+			path.join(os.homedir(), ".mcporter", definition.name);
 		await ensureDirectory(tokenDir);
 
 		const server = http.createServer();
+		const overrideRedirect = definition.oauthRedirectUrl
+			? new URL(definition.oauthRedirectUrl)
+			: null;
+		const listenHost = overrideRedirect?.hostname ?? CALLBACK_HOST;
+		const desiredPort = overrideRedirect?.port
+			? Number.parseInt(overrideRedirect.port, 10)
+			: undefined;
+		const callbackPath =
+			overrideRedirect?.pathname && overrideRedirect.pathname !== "/"
+				? overrideRedirect.pathname
+				: CALLBACK_PATH;
 		const port = await new Promise<number>((resolve, reject) => {
-			server.listen(0, CALLBACK_HOST, () => {
+			server.listen(desiredPort ?? 0, listenHost, () => {
 				const address = server.address();
 				if (typeof address === "object" && address && "port" in address) {
 					resolve(address.port);
@@ -137,7 +149,19 @@ class FileOAuthClientProvider implements OAuthClientProvider {
 			server.once("error", (error) => reject(error));
 		});
 
-		const redirectUrl = new URL(`http://${CALLBACK_HOST}:${port}/callback`);
+		const redirectUrl = overrideRedirect
+			? new URL(overrideRedirect.toString())
+			: new URL(`http://${listenHost}:${port}${callbackPath}`);
+		if (!overrideRedirect || overrideRedirect.port === "") {
+			redirectUrl.port = String(port);
+		}
+		if (
+			!overrideRedirect ||
+			overrideRedirect.pathname === "/" ||
+			overrideRedirect.pathname === ""
+		) {
+			redirectUrl.pathname = callbackPath;
+		}
 
 		const provider = new FileOAuthClientProvider(
 			definition,

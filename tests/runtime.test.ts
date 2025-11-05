@@ -8,7 +8,7 @@ import {
 	withEnvOverrides,
 } from "../src/env.js";
 
-const FIXTURE_PATH = path.resolve(__dirname, "fixtures", "mcp-runtime.json");
+const FIXTURE_PATH = path.resolve(__dirname, "fixtures", "mcporter.json");
 
 describe("loadServerDefinitions", () => {
 	it("parses all Sweetistics servers", async () => {
@@ -27,7 +27,7 @@ describe("loadServerDefinitions", () => {
 		);
 		const vercel = servers.find((server) => server.name === "vercel");
 		expect(vercel?.tokenCacheDir).toBe(
-			path.join(os.homedir(), ".mcp-runtime", "vercel"),
+			path.join(os.homedir(), ".mcporter", "vercel"),
 		);
 	});
 

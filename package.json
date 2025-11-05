@@ -1,6 +1,6 @@
 {
-  "name": "mcp-runtime",
-  "version": "0.2.0",
+  "name": "mcporter",
+  "version": "0.1.0",
   "description": "TypeScript runtime and CLI for connecting to configured Model Context Protocol servers.",
   "type": "module",
   "main": "dist/index.js",
@@ -17,7 +17,7 @@
     }
   },
   "bin": {
-    "mcp-runtime": "./dist/cli.js"
+    "mcporter": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -30,8 +30,8 @@
     "clean": "rimraf dist",
     "dev": "tsc -w -p tsconfig.build.json",
     "prepublishOnly": "pnpm check && pnpm test && pnpm build",
-    "mcp:list": "pnpm exec tsx src/cli.ts list",
-    "mcp:call": "pnpm exec tsx src/cli.ts call"
+    "mcporter:list": "pnpm exec tsx src/cli.ts list",
+    "mcporter:call": "pnpm exec tsx src/cli.ts call"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
@@ -58,7 +58,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/steipete/mcp-runtime"
+    "url": "https://github.com/steipete/mcporter"
   },
   "keywords": [
     "mcp",

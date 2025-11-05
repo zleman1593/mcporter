@@ -3,7 +3,7 @@
 Default behavior: generating `generated/<server>-cli.ts` if no output path is provided. Bundling is opt-in via `--bundle` and produces a single JS file with shebang; otherwise we emit TypeScript targeting Node.js.
 
 ## Goal
-Create an `mcp-runtime generate-cli` command that produces a standalone CLI for a single MCP server. The generated CLI should feel like a Unix tool: subcommands map to MCP tools, arguments translate to schema fields, and output can be piped/redirected easily.
+Create an `mcporter generate-cli` command that produces a standalone CLI for a single MCP server. The generated CLI should feel like a Unix tool: subcommands map to MCP tools, arguments translate to schema fields, and output can be piped/redirected easily.
 
 ## High-Level Requirements
 - **Input**: Identify the target server either by shorthand name or by providing an explicit MCP server definition.
@@ -54,7 +54,7 @@ Create an `mcp-runtime generate-cli` command that produces a standalone CLI for 
 
 ```bash
 # Inline definition, emit TypeScript + minified bundle
-npx mcp-runtime generate-cli \
+npx mcporter generate-cli \
   --server '{
     "name":"context7",
     "command":"https://mcp.context7.com/mcp",
@@ -64,7 +64,7 @@ npx mcp-runtime generate-cli \
   --minify
 
 # Bun-friendly binary using --compile (requires Bun installed)
-npx mcp-runtime generate-cli \
+npx mcporter generate-cli \
   --server '{"name":"context7","command":"https://mcp.context7.com/mcp"}' \
   --output dist/context7.ts \
   --runtime bun \

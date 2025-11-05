@@ -43,7 +43,7 @@
 			"description": "Vercel MCP (requires OAuth).",
 			"baseUrl": "https://mcp.vercel.com",
 			"auth": "oauth",
-			"tokenCacheDir": "~/.cache/mcp-runtime/vercel"
+			"tokenCacheDir": "~/.mcporter/vercel"
 		},
 		"firecrawl": {
 			"description": "Firecrawl hosted MCP for authenticated scraping and extraction.",
