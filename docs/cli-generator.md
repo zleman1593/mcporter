@@ -77,11 +77,20 @@ chmod +x context7
 
 
 
+## Artifact Metadata & Regeneration
+
+- Every generated artifact writes `<artifact>.metadata.json` alongside the output. The file records the generator version, resolved server definition, and the exact `generate-cli` flags we used (runtime, bundle/compile targets, timeout, minify, etc.).
+- `mcporter inspect-cli <artifact>` reads that metadata and prints a summary (pass `--json` to emit the raw payload). The output includes a ready-to-run `generate-cli` command as well as the simpler `mcporter regenerate-cli` wrapper.
+- `mcporter regenerate-cli <artifact>` replays the stored invocation against the latest mcporter build. Flags such as `--dry-run`, `--server`, `--config`, `--runtime`, `--timeout`, `--minify`, `--bundle`, `--compile`, and `--output` let you override pieces of the stored metadata when necessary.
+- Metadata is emitted for templates, bundles, and compiled binaries (when they persist on disk), so any artifact can be refreshed after a generator upgrade.
+
+
+
 ## Status
 - ✅ `generate-cli` subcommand implemented with schema-aware proxy generation.
 - ✅ Inline JSON / file / shorthand server resolution wired up.
 - ✅ Bundling via esbuild (Node or Bun) with optional minification and Bun bytecode compilation.
-- ✅ Integration tests cover bundling, minification, and compiled binaries against the mock MCP server.
+- ✅ Integration tests cover bundling, minification, compiled binaries, and metadata/regeneration flows against the mock MCP server.
 
 Next steps:
 1. Add optional shell completion scaffolding if demand arises.

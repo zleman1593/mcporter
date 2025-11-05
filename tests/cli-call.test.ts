@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 process.env.MCPORTER_DISABLE_AUTORUN = '1';
 const cliModulePromise = import('../src/cli.js');
@@ -28,6 +28,14 @@ describe('CLI call argument parsing', () => {
     expect(parsed.args).toEqual({});
   });
 
+  it('captures timeout flag values', async () => {
+    const { parseCallArguments } = await cliModulePromise;
+    const parsed = parseCallArguments(['chrome-devtools', '--timeout', '2500', '--tool', 'list_pages']);
+    expect(parsed.selector).toBe('chrome-devtools');
+    expect(parsed.tool).toBe('list_pages');
+    expect(parsed.timeoutMs).toBe(2500);
+  });
+
   it('retains key=value arguments after the selector and tool', async () => {
     const { parseCallArguments } = await cliModulePromise;
     const parsed = parseCallArguments(['chrome-devtools', 'list_pages', 'timeout=500']);
@@ -41,5 +49,24 @@ describe('CLI call argument parsing', () => {
     expect(() => parseCallArguments(['chrome-devtools', 'list_pages', 'oops'])).toThrow(
       "Argument 'oops' must be key=value format."
     );
+  });
+
+  it('aborts long-running tools when the timeout elapses', async () => {
+    vi.useFakeTimers();
+    try {
+      const { handleCall } = await cliModulePromise;
+      const runtime = {
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve('done'), 1000);
+          }),
+      };
+      const promise = handleCall(runtime as never, ['chrome-devtools.list_pages', '--timeout', '10']);
+      const expectation = expect(promise).rejects.toThrow('Call to chrome-devtools.list_pages timed out after 10ms.');
+      await vi.runOnlyPendingTimersAsync();
+      await expectation;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

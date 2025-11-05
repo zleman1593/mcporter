@@ -66,6 +66,8 @@ npx mcporter auth vercel --reset           # clear cached tokens, then walk thro
 npx mcporter auth vercel                   # pre-authorize OAuth flows without listing tools
 npx mcporter call linear.searchIssues owner=ENG status=InProgress
 npx mcporter call signoz.query --tail-log  # print the tail of returned log files
+npx mcporter inspect-cli scripts/cli/vercel        # show metadata + stored generate-cli command
+npx mcporter regenerate-cli scripts/cli/vercel     # rebuild a CLI artifact using saved metadata
 
 # Local scripts for workspace automation
 pnpm mcporter:list                                 # alias for mcporter list
@@ -73,6 +75,8 @@ pnpm mcporter:call chrome-devtools.getTabs --tail-log
 pnpm mcporter:auth vercel --reset                  # same as mcporter auth --reset
 pnpm mcporter:auth vercel                          # same as mcporter auth
 ```
+
+Generated artifacts drop a companion `<artifact>.metadata.json` that records the generator version, resolved server definition, and the exact `generate-cli` flags that produced the file. Use `mcporter inspect-cli <artifact>` to review the metadata (or emit JSON with `--json`), and `mcporter regenerate-cli <artifact>` to replay the stored invocation against the latest mcporter build.
 
 `pnpm mcporter:list` respects `MCPORTER_LIST_TIMEOUT` (milliseconds, default `30000`). The aggregated view fans out in parallel and prints either the tool count or a short status (e.g., `auth required — run 'mcporter auth <name>'`). Export a higher timeout when you need to inspect slow-starting servers:
 

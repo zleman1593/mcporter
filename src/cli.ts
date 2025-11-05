@@ -4,6 +4,8 @@ import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { CliArtifactMetadata, SerializedServerDefinition } from './cli-metadata.js';
+import { readCliMetadata } from './cli-metadata.js';
 import type { ServerSource } from './config.js';
 import { generateCli } from './generate-cli.js';
 import { createRuntime } from './runtime.js';
@@ -46,6 +48,16 @@ async function main(): Promise<void> {
 
   if (command === 'generate-cli') {
     await handleGenerateCli(argv, globalFlags);
+    return;
+  }
+
+  if (command === 'inspect-cli') {
+    await handleInspectCli(argv);
+    return;
+  }
+
+  if (command === 'regenerate-cli') {
+    await handleRegenerateCli(argv, globalFlags);
     return;
   }
 
@@ -224,6 +236,7 @@ function expectValue(flag: string, value: string | undefined): string {
 }
 
 const LIST_TIMEOUT_MS = Number.parseInt(process.env.MCPORTER_LIST_TIMEOUT ?? '30000', 10);
+const CALL_TIMEOUT_MS = Number.parseInt(process.env.MCPORTER_CALL_TIMEOUT ?? '60000', 10);
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   // Race the original promise with a timeout to keep CLI responsive.
@@ -272,6 +285,267 @@ async function handleGenerateCli(args: string[], globalFlags: FlagMap): Promise<
   }
   if (compilePath) {
     console.log(`Compiled executable created at ${compilePath}`);
+  }
+}
+
+interface InspectFlags {
+  artifactPath: string;
+  format: 'text' | 'json';
+}
+
+function parseInspectFlags(args: string[]): InspectFlags {
+  let format: 'text' | 'json' = 'text';
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index];
+    if (!token) {
+      index += 1;
+      continue;
+    }
+    if (token === '--json') {
+      format = 'json';
+      args.splice(index, 1);
+      continue;
+    }
+    if (token === '--format') {
+      const value = expectValue(token, args[index + 1]);
+      if (value !== 'json' && value !== 'text') {
+        throw new Error("--format must be 'json' or 'text'.");
+      }
+      format = value;
+      args.splice(index, 2);
+      continue;
+    }
+    if (token.startsWith('--')) {
+      throw new Error(`Unknown flag '${token}' for inspect-cli.`);
+    }
+    index += 1;
+  }
+  const artifactPath = args.shift();
+  if (!artifactPath) {
+    throw new Error('Usage: mcporter inspect-cli <artifact> [--json]');
+  }
+  return { artifactPath, format };
+}
+
+interface RegenerateOverrides {
+  server?: string;
+  config?: string;
+  runtime?: 'node' | 'bun';
+  timeoutMs?: number;
+  minify?: boolean;
+  outputPath?: string;
+  bundle?: boolean | string;
+  compile?: boolean | string;
+}
+
+interface RegenerateParseResult {
+  artifactPath: string;
+  overrides: RegenerateOverrides;
+  dryRun: boolean;
+}
+
+function parseRegenerateFlags(args: string[]): RegenerateParseResult {
+  const overrides: RegenerateOverrides = {};
+  let dryRun = false;
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index];
+    if (!token) {
+      index += 1;
+      continue;
+    }
+    if (token === '--dry-run') {
+      dryRun = true;
+      args.splice(index, 1);
+      continue;
+    }
+    if (token === '--server') {
+      overrides.server = expectValue(token, args[index + 1]);
+      args.splice(index, 2);
+      continue;
+    }
+    if (token === '--config') {
+      overrides.config = expectValue(token, args[index + 1]);
+      args.splice(index, 2);
+      continue;
+    }
+    if (token === '--runtime') {
+      const value = expectValue(token, args[index + 1]);
+      if (value !== 'node' && value !== 'bun') {
+        throw new Error("--runtime must be 'node' or 'bun'.");
+      }
+      overrides.runtime = value;
+      args.splice(index, 2);
+      continue;
+    }
+    if (token === '--timeout') {
+      const value = Number.parseInt(expectValue(token, args[index + 1]), 10);
+      if (!Number.isFinite(value) || value <= 0) {
+        throw new Error('--timeout must be a positive integer.');
+      }
+      overrides.timeoutMs = value;
+      args.splice(index, 2);
+      continue;
+    }
+    if (token === '--minify') {
+      overrides.minify = true;
+      args.splice(index, 1);
+      continue;
+    }
+    if (token === '--no-minify') {
+      overrides.minify = false;
+      args.splice(index, 1);
+      continue;
+    }
+    if (token === '--output') {
+      overrides.outputPath = expectValue(token, args[index + 1]);
+      args.splice(index, 2);
+      continue;
+    }
+    if (token === '--bundle') {
+      const next = args[index + 1];
+      if (!next || next.startsWith('--')) {
+        overrides.bundle = true;
+        args.splice(index, 1);
+      } else {
+        overrides.bundle = next;
+        args.splice(index, 2);
+      }
+      continue;
+    }
+    if (token === '--compile') {
+      const next = args[index + 1];
+      if (!next || next.startsWith('--')) {
+        overrides.compile = true;
+        args.splice(index, 1);
+      } else {
+        overrides.compile = next;
+        args.splice(index, 2);
+      }
+      continue;
+    }
+    if (token.startsWith('--')) {
+      throw new Error(`Unknown flag '${token}' for regenerate-cli.`);
+    }
+    index += 1;
+  }
+  const artifactPath = args.shift();
+  if (!artifactPath) {
+    throw new Error('Usage: mcporter regenerate-cli <artifact> [options]');
+  }
+  return { artifactPath, overrides, dryRun };
+}
+
+export async function handleInspectCli(args: string[]): Promise<void> {
+  const parsed = parseInspectFlags(args);
+  const metadata = await readCliMetadata(parsed.artifactPath);
+  if (parsed.format === 'json') {
+    console.log(JSON.stringify(metadata, null, 2));
+    return;
+  }
+  console.log(`Artifact: ${formatPathForDisplay(metadata.artifact.path)} (${metadata.artifact.kind})`);
+  console.log(`Server: ${metadata.server.name}`);
+  if (metadata.server.source) {
+    const suffix = formatSourceSuffix(metadata.server.source, true);
+    if (suffix) {
+      console.log(`Source: ${suffix}`);
+    }
+  }
+  console.log(
+    `Generated: ${new Date(metadata.generatedAt).toISOString()} via ${metadata.generator.name}@${
+      metadata.generator.version
+    }`
+  );
+  if (metadata.invocation.runtime) {
+    console.log(`Runtime: ${metadata.invocation.runtime}`);
+  }
+  console.log('Invocation flags:');
+  for (const [key, value] of Object.entries(metadata.invocation)) {
+    if (value === undefined || value === null || key === 'runtime') {
+      continue;
+    }
+    console.log(`  ${key}: ${Array.isArray(value) ? JSON.stringify(value) : String(value)}`);
+  }
+  const dryRunCommand = buildGenerateCliCommand(metadata.invocation, metadata.server.definition);
+  console.log('Regenerate with:');
+  console.log(`  mcporter regenerate-cli ${shellQuote(parsed.artifactPath)}`);
+  if (dryRunCommand) {
+    console.log('Underlying generate-cli command:');
+    console.log(`  ${dryRunCommand}`);
+  }
+}
+
+export async function handleRegenerateCli(args: string[], globalFlags: FlagMap): Promise<void> {
+  const parsed = parseRegenerateFlags(args);
+  const metadata = await readCliMetadata(parsed.artifactPath);
+  const invocation = { ...metadata.invocation };
+  if (parsed.overrides.server) {
+    invocation.serverRef = parsed.overrides.server;
+  }
+  if (!invocation.serverRef) {
+    invocation.serverRef = metadata.server.name ?? JSON.stringify(metadata.server.definition);
+  }
+  if (parsed.overrides.config) {
+    invocation.configPath = parsed.overrides.config;
+  } else if (globalFlags['--config']) {
+    invocation.configPath = globalFlags['--config'];
+  }
+  if (globalFlags['--root']) {
+    invocation.rootDir = globalFlags['--root'];
+  }
+  if (parsed.overrides.runtime) {
+    invocation.runtime = parsed.overrides.runtime;
+  }
+  if (parsed.overrides.timeoutMs !== undefined) {
+    invocation.timeoutMs = parsed.overrides.timeoutMs;
+  }
+  if (parsed.overrides.minify !== undefined) {
+    invocation.minify = parsed.overrides.minify;
+  }
+  if (parsed.overrides.outputPath !== undefined) {
+    invocation.outputPath = parsed.overrides.outputPath;
+  }
+  if (parsed.overrides.bundle !== undefined) {
+    invocation.bundle = parsed.overrides.bundle;
+  }
+  if (parsed.overrides.compile !== undefined) {
+    invocation.compile = parsed.overrides.compile;
+  }
+
+  if (!invocation.serverRef) {
+    invocation.serverRef = JSON.stringify(metadata.server.definition);
+  }
+  if (!invocation.runtime) {
+    invocation.runtime = 'node';
+  }
+  if (parsed.dryRun) {
+    const command = buildGenerateCliCommand(invocation, metadata.server.definition, globalFlags);
+    console.log('Dry run — would execute:');
+    console.log(`  ${command}`);
+    return;
+  }
+
+  const result = await generateCli({
+    serverRef: invocation.serverRef,
+    configPath: invocation.configPath,
+    rootDir: invocation.rootDir,
+    outputPath: invocation.outputPath,
+    runtime: invocation.runtime,
+    bundle: invocation.bundle,
+    timeoutMs: invocation.timeoutMs,
+    minify: invocation.minify,
+    compile: invocation.compile,
+  });
+
+  if (metadata.artifact.kind === 'binary' && result.compilePath) {
+    console.log(`Regenerated compiled CLI at ${result.compilePath}`);
+  } else if (metadata.artifact.kind === 'bundle' && result.bundlePath) {
+    console.log(`Regenerated bundled CLI at ${result.bundlePath}`);
+  } else if (metadata.artifact.kind === 'template') {
+    console.log(`Regenerated template at ${result.outputPath}`);
+  } else {
+    console.log('Regeneration completed.');
   }
 }
 
@@ -417,7 +691,7 @@ export async function handleList(runtime: Awaited<ReturnType<typeof createRuntim
 }
 
 // handleCall invokes a tool, prints JSON, and optionally tails logs.
-async function handleCall(runtime: Awaited<ReturnType<typeof createRuntime>>, args: string[]): Promise<void> {
+export async function handleCall(runtime: Awaited<ReturnType<typeof createRuntime>>, args: string[]): Promise<void> {
   const parsed = parseCallArguments(args);
   const selector = parsed.selector;
   let server = parsed.server;
@@ -440,7 +714,19 @@ async function handleCall(runtime: Awaited<ReturnType<typeof createRuntime>>, ar
     throw new Error('Missing tool name. Provide it via <server>.<tool> or --tool.');
   }
 
-  const result = await runtime.callTool(server, tool, { args: parsed.args });
+  const timeoutMs = parsed.timeoutMs ?? CALL_TIMEOUT_MS;
+  let result: unknown;
+  try {
+    result = await withTimeout(runtime.callTool(server, tool, { args: parsed.args }), timeoutMs);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Timeout') {
+      const timeoutDisplay = `${timeoutMs}ms`;
+      throw new Error(
+        `Call to ${server}.${tool} timed out after ${timeoutDisplay}. Override MCPORTER_CALL_TIMEOUT or pass --timeout to adjust.`
+      );
+    }
+    throw error;
+  }
 
   if (typeof result === 'string') {
     try {
@@ -512,6 +798,7 @@ interface CallArgsParseResult {
   tool?: string;
   args: Record<string, unknown>;
   tailLog?: boolean;
+  timeoutMs?: number;
 }
 
 // parseCallArguments supports selectors, JSON payloads, and key=value args.
@@ -563,6 +850,19 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
     if (token === '--tail-log') {
       result.tailLog = true;
       index += 1;
+      continue;
+    }
+    if (token === '--timeout') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new Error('--timeout requires a value (milliseconds).');
+      }
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        throw new Error('--timeout must be a positive integer (milliseconds).');
+      }
+      result.timeoutMs = parsed;
+      index += 2;
       continue;
     }
     positional.push(token);
@@ -681,6 +981,57 @@ function tailLogIfRequested(result: unknown, enabled: boolean): void {
   }
 }
 
+function buildGenerateCliCommand(
+  invocation: CliArtifactMetadata['invocation'],
+  definition: SerializedServerDefinition,
+  globalFlags: FlagMap = {}
+): string {
+  const tokens: string[] = ['mcporter'];
+  const configPath = invocation.configPath ?? globalFlags['--config'];
+  const rootDir = invocation.rootDir ?? globalFlags['--root'];
+  if (configPath) {
+    tokens.push('--config', configPath);
+  }
+  if (rootDir) {
+    tokens.push('--root', rootDir);
+  }
+  tokens.push('generate-cli');
+
+  const serverRef = invocation.serverRef ?? definition.name ?? JSON.stringify(definition);
+  tokens.push('--server', serverRef);
+
+  if (invocation.outputPath) {
+    tokens.push('--output', invocation.outputPath);
+  }
+  if (typeof invocation.bundle === 'string') {
+    tokens.push('--bundle', invocation.bundle);
+  } else if (invocation.bundle) {
+    tokens.push('--bundle');
+  }
+  if (typeof invocation.compile === 'string') {
+    tokens.push('--compile', invocation.compile);
+  } else if (invocation.compile) {
+    tokens.push('--compile');
+  }
+  if (invocation.runtime) {
+    tokens.push('--runtime', invocation.runtime);
+  }
+  if (invocation.timeoutMs && invocation.timeoutMs !== 30_000) {
+    tokens.push('--timeout', String(invocation.timeoutMs));
+  }
+  if (invocation.minify) {
+    tokens.push('--minify');
+  }
+  return tokens.map(shellQuote).join(' ');
+}
+
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./@%-]+$/.test(value)) {
+    return value;
+  }
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 // printHelp explains available commands and global flags.
 function printHelp(message?: string): void {
   if (message) {
@@ -694,6 +1045,17 @@ Commands:
   call [selector] [flags]            Call a tool (selector like server.tool)
     --tail-log                       Tail log output when the tool returns a log file path
   auth <name>                        Complete the OAuth flow for a server without listing tools
+  inspect-cli <path> [--json]        Show metadata and regeneration info for a generated CLI artifact
+  regenerate-cli <path> [options]    Re-run generate-cli using stored metadata to refresh an artifact
+    --dry-run                         Print the generate-cli command without executing
+    --server <ref>                    Override the stored server reference
+    --config <path>                   Override config path from metadata
+    --runtime node|bun                Force runtime selection when regenerating
+    --timeout <ms>                    Override schema introspection timeout
+    --minify/--no-minify              Toggle bundle minification
+    --output <path>                   Override template output path
+    --bundle [path]                   Override bundle path (omit value to auto-name)
+    --compile [path]                  Override compiled binary path (omit value to auto-name)
   generate-cli --server <ref>        Generate a standalone CLI
     --name <name>                    Supply a friendly name (otherwise inferred)
     --command <ref>                  MCP command or URL (required without --server)

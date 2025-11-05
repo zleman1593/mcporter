@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express from 'express';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { metadataPathForArtifact, readCliMetadata } from '../src/cli-metadata.js';
 import { generateCli, __test as generateCliInternals } from '../src/generate-cli.js';
 
 let baseUrl: URL;
@@ -138,6 +139,12 @@ describe('generateCli', () => {
     });
     expect(stdout).toContain('Available tools');
 
+    const compileMetadata = await readCliMetadata(compilePath);
+    expect(compileMetadata.artifact.kind).toBe('binary');
+    expect(compileMetadata.artifact.path).toBe(path.resolve(compilePath));
+    expect(compileMetadata.invocation.compile).toBe(compilePath);
+    expect(compileMetadata.server.name).toBe('integration');
+
     const packageJson = JSON.parse(await fs.readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
       name?: string;
       version?: string;
@@ -210,6 +217,14 @@ describe('generateCli', () => {
     });
     const altContent = await fs.readFile(altOutput, 'utf8');
     expect(altContent).toContain('const embeddedName = "integration"');
+
+    const altMetadataPath = metadataPathForArtifact(altOutput);
+    const altMetadata = JSON.parse(await fs.readFile(altMetadataPath, 'utf8')) as Awaited<
+      ReturnType<typeof readCliMetadata>
+    >;
+    expect(altMetadata.artifact.kind).toBe('template');
+    expect(altMetadata.invocation.outputPath).toBe(altOutput);
+    expect(['node', 'bun']).toContain(altMetadata.invocation.runtime);
 
     // --raw path exercised implicitly by runtime when needed; end-to-end call
     // verification is covered in runtime integration tests.

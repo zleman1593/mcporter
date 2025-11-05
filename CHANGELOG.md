@@ -13,7 +13,8 @@
 - Generated CLIs now show full command signatures in help and support `--compile` without leaving template/bundle intermediates.
 - StdIO-backed MCP servers now receive resolved environment overrides, so API keys flow through to launched processes like `obsidian-mcp-server`.
 - Hardened the CLI generator to surface enum defaults/metadata and added regression tests around the new helper utilities.
-- Fixed `mcporter call <server> <tool>` so the second positional is treated as the tool name instead of triggering the "Argument must be key=value" error, and accepted `tool=`/`command=` selectors now play nicely with additional key=value payloads.
+- Generated artifacts now emit `<artifact>.metadata.json` files plus `mcporter inspect-cli` / `mcporter regenerate-cli` workflows (with `--dry-run` and overrides) so binaries can be refreshed after upgrading mcporter.
+- Fixed `mcporter call <server> <tool>` so the second positional is treated as the tool name instead of triggering the "Argument must be key=value" error, accepted `tool=`/`command=` selectors now play nicely with additional key=value payloads, and added a default call timeout (configurable via `MCPORTER_CALL_TIMEOUT` or `--timeout`) so long-running tools can’t hang the CLI indefinitely.
 
 ## [0.1.0]
 

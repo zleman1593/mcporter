@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { build as esbuild } from 'esbuild';
+import { type CliArtifactKind, type CliArtifactMetadata, writeCliMetadata } from './cli-metadata.js';
 import { type HttpCommand, loadServerDefinitions, type ServerDefinition, type StdioCommand } from './config.js';
 import type { ServerToolInfo } from './runtime.js';
 import { createRuntime } from './runtime.js';
@@ -106,7 +107,104 @@ export async function generateCli(
     }
   }
 
+  const metadataTargets: Array<{ path: string; kind: CliArtifactKind; invocation: CliInvocationSnapshot }> = [];
+  const baseInvocation: CliInvocationSnapshot = {
+    serverRef: options.serverRef,
+    configPath: options.configPath,
+    rootDir: options.rootDir,
+    runtime: runtimeKind,
+    outputPath: options.outputPath,
+    bundle: options.bundle,
+    compile: options.compile,
+    timeoutMs,
+    minify: options.minify ?? false,
+  };
+
+  const templatePersisted = !templateTmpDir || Boolean(options.outputPath);
+  if (templatePersisted && (await fileExists(outputPath))) {
+    metadataTargets.push({
+      path: outputPath,
+      kind: 'template',
+      invocation: {
+        ...baseInvocation,
+        outputPath,
+      },
+    });
+  }
+
+  if (bundlePath) {
+    metadataTargets.push({
+      path: bundlePath,
+      kind: 'bundle',
+      invocation: {
+        ...baseInvocation,
+        bundle: bundlePath,
+      },
+    });
+  }
+
+  if (compilePath) {
+    metadataTargets.push({
+      path: compilePath,
+      kind: 'binary',
+      invocation: {
+        ...baseInvocation,
+        compile: compilePath,
+      },
+    });
+  }
+
+  if (metadataTargets.length > 0) {
+    await Promise.all(
+      metadataTargets.map((entry) =>
+        writeCliMetadata({
+          artifactPath: entry.path,
+          kind: entry.kind,
+          generator,
+          server: { name, source: definition.source, definition },
+          invocation: ensureInvocationDefaults(entry.invocation, definition),
+        })
+      )
+    );
+  }
+
   return { outputPath: options.outputPath ?? outputPath, bundlePath, compilePath };
+}
+
+interface CliInvocationSnapshot {
+  serverRef?: string;
+  configPath?: string;
+  rootDir?: string;
+  runtime: 'node' | 'bun';
+  outputPath?: string;
+  bundle?: boolean | string;
+  compile?: boolean | string;
+  timeoutMs: number;
+  minify: boolean;
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureInvocationDefaults(
+  invocation: CliInvocationSnapshot,
+  definition: ServerDefinition
+): CliArtifactMetadata['invocation'] {
+  const serverRef = invocation.serverRef ?? definition.name;
+  const configPath =
+    invocation.configPath ??
+    (definition.source && definition.source.kind === 'local' ? definition.source.path : undefined);
+  return {
+    ...invocation,
+    serverRef,
+    configPath,
+  };
 }
 
 async function resolveServerDefinition(
