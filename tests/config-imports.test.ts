@@ -6,7 +6,7 @@ import { loadServerDefinitions } from "../src/config.js";
 
 const FIXTURE_ROOT = path.resolve(__dirname, "fixtures", "imports");
 
-let homedirSpy: ReturnType<typeof vi.spyOn> | undefined;
+let homedirSpy: { mockRestore(): void } | undefined;
 
 beforeEach(() => {
 	const fakeHome = path.join(FIXTURE_ROOT, "home");
