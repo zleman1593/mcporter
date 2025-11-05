@@ -55,6 +55,11 @@ export interface StdioCommand {
 
 export type CommandSpec = HttpCommand | StdioCommand;
 
+export interface ServerSource {
+  readonly kind: 'local' | 'import';
+  readonly path: string;
+}
+
 export interface ServerDefinition {
   readonly name: string;
   readonly description?: string;
@@ -64,6 +69,7 @@ export interface ServerDefinition {
   readonly tokenCacheDir?: string;
   readonly clientName?: string;
   readonly oauthRedirectUrl?: string;
+  readonly source?: ServerSource;
 }
 
 export interface LoadConfigOptions {
@@ -76,7 +82,7 @@ export async function loadServerDefinitions(options: LoadConfigOptions = {}): Pr
   const configPath = resolveConfigPath(options.configPath, rootDir);
   const config = await readConfigFile(configPath);
 
-  const merged = new Map<string, { raw: RawEntry; baseDir: string }>();
+  const merged = new Map<string, { raw: RawEntry; baseDir: string; source: ServerSource }>();
 
   const imports = config.imports ?? DEFAULT_IMPORTS;
   for (const importKind of imports) {
@@ -91,19 +97,27 @@ export async function loadServerDefinitions(options: LoadConfigOptions = {}): Pr
         if (merged.has(name)) {
           continue;
         }
-        merged.set(name, { raw: rawEntry, baseDir: path.dirname(resolved) });
+        merged.set(name, {
+          raw: rawEntry,
+          baseDir: path.dirname(resolved),
+          source: { kind: 'import', path: resolved },
+        });
       }
     }
   }
 
   for (const [name, entryRaw] of Object.entries(config.mcpServers)) {
     const parsed = RawEntrySchema.parse(entryRaw);
-    merged.set(name, { raw: parsed, baseDir: rootDir });
+    merged.set(name, {
+      raw: parsed,
+      baseDir: rootDir,
+      source: { kind: 'local', path: configPath },
+    });
   }
 
   const servers: ServerDefinition[] = [];
-  for (const [name, { raw, baseDir: entryBaseDir }] of merged) {
-    servers.push(normalizeServerEntry(name, raw, entryBaseDir));
+  for (const [name, { raw, baseDir: entryBaseDir, source }] of merged) {
+    servers.push(normalizeServerEntry(name, raw, entryBaseDir, source));
   }
 
   return servers;
@@ -127,7 +141,7 @@ async function readConfigFile(configPath: string): Promise<RawConfig> {
   return RawConfigSchema.parse(JSON.parse(buffer));
 }
 
-function normalizeServerEntry(name: string, raw: RawEntry, baseDir: string): ServerDefinition {
+function normalizeServerEntry(name: string, raw: RawEntry, baseDir: string, source: ServerSource): ServerDefinition {
   const description = raw.description;
   const env = raw.env ? { ...raw.env } : undefined;
   const auth = normalizeAuth(raw.auth);
@@ -170,6 +184,7 @@ function normalizeServerEntry(name: string, raw: RawEntry, baseDir: string): Ser
     tokenCacheDir: resolvedTokenCacheDir,
     clientName,
     oauthRedirectUrl,
+    source,
   };
 }
 

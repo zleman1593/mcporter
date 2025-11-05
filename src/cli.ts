@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { generateCli } from './generate-cli.js';
 import { createRuntime } from './runtime.js';
+import type { ServerSource } from './config.js';
 
 type FlagMap = Partial<Record<string, string>>;
 
@@ -358,12 +361,13 @@ async function handleList(runtime: Awaited<ReturnType<typeof createRuntime>>, ar
     for (const result of results) {
       const description = result.server.description ? ` — ${result.server.description}` : '';
       const durationSeconds = (result.durationMs / 1000).toFixed(1);
+      const sourceSuffix = formatSourceSuffix(result.server.source);
       if (result.status === 'ok') {
         const toolSuffix =
           result.tools.length === 0
             ? 'no tools reported'
             : `${result.tools.length === 1 ? '1 tool' : `${result.tools.length} tools`}`;
-        console.log(`- ${result.server.name}${description} (${toolSuffix}, ${durationSeconds}s)`);
+        console.log(`- ${result.server.name}${description} (${toolSuffix}, ${durationSeconds}s)${sourceSuffix}`);
         continue;
       }
 
@@ -378,12 +382,14 @@ async function handleList(runtime: Awaited<ReturnType<typeof createRuntime>>, ar
       } else {
         note = String(error);
       }
-      console.log(`- ${result.server.name}${description} (${note}, ${durationSeconds}s)`);
+      console.log(`- ${result.server.name}${description} (${note}, ${durationSeconds}s)${sourceSuffix}`);
     }
     return;
   }
 
   try {
+    const definition = runtime.getDefinition(target);
+    const sourcePath = formatSourceSuffix(definition.source, true);
     const tools = await withTimeout(
       runtime.listTools(target, {
         includeSchema: flags.schema,
@@ -391,10 +397,17 @@ async function handleList(runtime: Awaited<ReturnType<typeof createRuntime>>, ar
       LIST_TIMEOUT_MS
     );
     if (tools.length === 0) {
+      console.log(`- ${target}`);
+      if (sourcePath) {
+        console.log(`  Source: ${sourcePath}`);
+      }
       console.log('  Tools: <none>');
       return;
     }
     console.log(`- ${target}`);
+    if (sourcePath) {
+      console.log(`  Source: ${sourcePath}`);
+    }
     console.log('  Tools:');
     for (const tool of tools) {
       const doc = tool.description ? `: ${tool.description}` : '';
@@ -466,6 +479,24 @@ function extractListFlags(args: string[]): { schema: boolean } {
     index += 1;
   }
   return { schema };
+}
+
+function formatSourceSuffix(source: ServerSource | undefined, inline = false): string {
+  if (!source || source.kind !== 'import') {
+    return '';
+  }
+  const formatted = formatPathForDisplay(source.path);
+  return inline ? formatted : ` [source: ${formatted}]`;
+}
+
+function formatPathForDisplay(filePath: string): string {
+  const cwd = process.cwd();
+  const relative = path.relative(cwd, filePath);
+  const displayPath =
+    relative && !relative.startsWith('..') && !path.isAbsolute(relative)
+      ? relative
+      : filePath.replace(os.homedir(), '~');
+  return displayPath;
 }
 
 interface CallArgsParseResult {

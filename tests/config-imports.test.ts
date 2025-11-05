@@ -45,15 +45,27 @@ describe('config imports', () => {
     expect(shared?.command.kind === 'http' ? shared.command.url.toString() : undefined).toBe(
       'https://cursor.local/mcp'
     );
+    expect(shared?.source).toEqual({
+      kind: 'import',
+      path: path.join(FIXTURE_ROOT, '.cursor', 'mcp.json'),
+    });
 
     const cursorOnly = servers.find((server) => server.name === 'cursor-only');
     expect(cursorOnly?.command.kind).toBe('http');
     expect(cursorOnly?.command.kind === 'http' ? cursorOnly.command.url.toString() : undefined).toBe(
       'https://local.override/cursor'
     );
+    expect(cursorOnly?.source).toEqual({
+      kind: 'local',
+      path: configPath,
+    });
 
     const codexOnly = servers.find((server) => server.name === 'codex-only');
     expect(codexOnly?.command.kind).toBe('stdio');
     expect(codexOnly?.command.kind === 'stdio' ? codexOnly.command.command : undefined).toBe('codex-cli');
+    expect(codexOnly?.source).toEqual({
+      kind: 'import',
+      path: path.join(FIXTURE_ROOT, 'home', '.codex', 'config.toml'),
+    });
   });
 });

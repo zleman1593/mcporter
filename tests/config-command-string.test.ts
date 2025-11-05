@@ -47,6 +47,10 @@ describe('command string parsing', () => {
     }
     expect(server.command.command).toBe('npx');
     expect(server.command.args).toEqual(['-y', 'xcodebuildmcp@latest']);
+    expect(server.source).toEqual({
+      kind: 'local',
+      path: configPath,
+    });
   });
 
   it('respects quoted segments inside command strings', async () => {
@@ -77,5 +81,9 @@ describe('command string parsing', () => {
     }
     expect(server.command.command).toBe('bash');
     expect(server.command.args).toEqual(['-lc', "echo 'hello world'"]);
+    expect(server.source).toEqual({
+      kind: 'local',
+      path: configPath,
+    });
   });
 });
