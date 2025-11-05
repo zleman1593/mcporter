@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Runtime, ServerToolInfo } from '../src/runtime.js';
 import type { CallResult } from '../src/index.js';
 import { createServerProxy } from '../src/index.js';
+import type { Runtime, ServerToolInfo } from '../src/runtime.js';
 
 type CallLogEntry = {
   server: string;
@@ -55,7 +55,10 @@ function createComposableRuntime() {
       callLog.push({ server, tool: toolName, options });
 
       if (server === 'docs' && toolName === 'lookup') {
-        const query = typeof options?.args === 'object' && options?.args !== null ? (options.args as { query?: string }).query : undefined;
+        const query =
+          typeof options?.args === 'object' && options?.args !== null
+            ? (options.args as { query?: string }).query
+            : undefined;
         return {
           content: [
             {

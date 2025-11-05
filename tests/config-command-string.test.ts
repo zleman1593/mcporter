@@ -41,6 +41,9 @@ describe('command string parsing', () => {
 
     expect(servers).toHaveLength(1);
     const server = servers[0];
+    if (!server) {
+      throw new Error('expected server definition');
+    }
     expect(server.command.kind).toBe('stdio');
     if (server.command.kind !== 'stdio') {
       throw new Error('expected stdio command');
@@ -70,11 +73,15 @@ describe('command string parsing', () => {
       })
     );
 
-    const [server] = await loadServerDefinitions({
+    const servers = await loadServerDefinitions({
       configPath,
       rootDir: tmpDir,
     });
 
+    const server = servers[0];
+    if (!server) {
+      throw new Error('expected server definition');
+    }
     expect(server.command.kind).toBe('stdio');
     if (server.command.kind !== 'stdio') {
       throw new Error('expected stdio command');

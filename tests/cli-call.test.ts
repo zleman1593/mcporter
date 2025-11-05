@@ -20,6 +20,14 @@ describe('CLI call argument parsing', () => {
     expect(parsed.args).toEqual({});
   });
 
+  it('treats command=NAME tokens as a tool alias for compatibility', async () => {
+    const { parseCallArguments } = await cliModulePromise;
+    const parsed = parseCallArguments(['chrome-devtools', 'command=list_pages']);
+    expect(parsed.selector).toBe('chrome-devtools');
+    expect(parsed.tool).toBe('list_pages');
+    expect(parsed.args).toEqual({});
+  });
+
   it('retains key=value arguments after the selector and tool', async () => {
     const { parseCallArguments } = await cliModulePromise;
     const parsed = parseCallArguments(['chrome-devtools', 'list_pages', 'timeout=500']);

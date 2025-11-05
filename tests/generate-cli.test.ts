@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express from 'express';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { __test as generateCliInternals, generateCli } from '../src/generate-cli.js';
+import { generateCli, __test as generateCliInternals } from '../src/generate-cli.js';
 
 let baseUrl: URL;
 const tmpDir = path.join(process.cwd(), 'tmp', 'mcporter-cli-tests');

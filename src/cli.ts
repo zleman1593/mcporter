@@ -4,9 +4,9 @@ import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { ServerSource } from './config.js';
 import { generateCli } from './generate-cli.js';
 import { createRuntime } from './runtime.js';
-import type { ServerSource } from './config.js';
 
 type FlagMap = Partial<Record<string, string>>;
 
@@ -584,7 +584,7 @@ export function parseCallArguments(args: string[]): CallArgsParseResult {
       throw new Error(`Argument '${token}' must be key=value format.`);
     }
     const value = coerceValue(raw);
-    if (key === 'tool' && !result.tool) {
+    if ((key === 'tool' || key === 'command') && !result.tool) {
       if (typeof value !== 'string') {
         throw new Error("Argument 'tool' must be a string value.");
       }

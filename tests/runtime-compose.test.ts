@@ -233,7 +233,9 @@ describe('stdio transport environment', () => {
             cwd: '/repo',
           },
           env: {
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: placeholders resolve against process env at runtime
             OBSIDIAN_API_KEY: '${OBSIDIAN_API_KEY}',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: placeholders resolve against process env at runtime
             OBSIDIAN_BASE_URL: '${OBSIDIAN_BASE_URL:-https://127.0.0.1:27124}',
             EMPTY_VAR: '',
           },

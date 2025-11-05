@@ -796,7 +796,8 @@ function pickExampleValue(option: GeneratedOption): string {
     return option.exampleValue;
   }
   if (option.enumValues && option.enumValues.length > 0) {
-    return option.enumValues[0]!;
+    const [first] = option.enumValues;
+    return first ?? option.property;
   }
   switch (option.type) {
     case 'number':
@@ -868,12 +869,6 @@ async function bundleOutput({
   });
   await fs.chmod(absTarget, 0o755);
   return absTarget;
-}
-
-function replaceExtension(file: string, extension: string): string {
-  const dirname = path.dirname(file);
-  const basename = path.basename(file, path.extname(file));
-  return path.join(dirname, `${basename}.${extension}`);
 }
 
 async function compileBundleWithBun(bundlePath: string, outputPath: string): Promise<void> {
