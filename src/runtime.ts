@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
@@ -155,7 +157,8 @@ class McpRuntime implements Runtime {
       }));
     } finally {
       if (!autoAuthorize) {
-        await context.transport.close().catch(() => {});
+        await context.client.close().catch(() => {});
+        await closeTransportAndWait(this.logger, context.transport).catch(() => {});
         await context.oauthSession?.close().catch(() => {});
       }
     }
@@ -219,7 +222,8 @@ class McpRuntime implements Runtime {
       if (!context) {
         return;
       }
-      await context.transport.close().catch(() => {});
+      await context.client.close().catch(() => {});
+      await closeTransportAndWait(this.logger, context.transport).catch(() => {});
       await context.oauthSession?.close().catch(() => {});
       this.clients.delete(normalized);
       return;
@@ -228,7 +232,8 @@ class McpRuntime implements Runtime {
     for (const [name, promise] of this.clients.entries()) {
       try {
         const context = await promise;
-        await context.transport.close().catch(() => {});
+        await context.client.close().catch(() => {});
+        await closeTransportAndWait(this.logger, context.transport).catch(() => {});
         await context.oauthSession?.close().catch(() => {});
       } finally {
         this.clients.delete(name);
@@ -296,7 +301,7 @@ class McpRuntime implements Runtime {
             oauthSession,
           };
         } catch (error) {
-          await streamableTransport.close().catch(() => {});
+          await closeTransportAndWait(this.logger, streamableTransport).catch(() => {});
           this.logger.warn(`Falling back to SSE transport for '${definition.name}': ${(error as Error).message}`);
           const sseTransport = new SSEClientTransport(definition.command.url, {
             ...baseOptions,
@@ -356,10 +361,247 @@ class McpRuntime implements Runtime {
   }
 }
 
+// closeTransportAndWait closes the transport and ensures its backing process exits.
+async function closeTransportAndWait(
+  logger: RuntimeLogger,
+  transport: Transport & { close(): Promise<void> }
+): Promise<void> {
+  const pidBeforeClose = getTransportPid(transport);
+  const childProcess =
+    transport instanceof StdioClientTransport
+      ? ((transport as unknown as { _process?: ChildProcess | null })._process ?? null)
+      : null;
+  try {
+    await transport.close();
+  } catch (error) {
+    logger.warn(`Failed to close transport cleanly: ${(error as Error).message}`);
+  }
+
+  if (childProcess) {
+    await waitForChildClose(childProcess, 500).catch(() => {});
+  }
+
+  if (!pidBeforeClose) {
+    return;
+  }
+
+  await ensureProcessTerminated(logger, pidBeforeClose);
+}
+
+// getTransportPid attempts to extract a PID from various transport implementations.
+function getTransportPid(transport: Transport & { pid?: number | null }): number | null {
+  if (transport instanceof StdioClientTransport) {
+    const pid = transport.pid;
+    return typeof pid === 'number' && pid > 0 ? pid : null;
+  }
+  if ('pid' in transport) {
+    const candidate = transport.pid;
+    if (typeof candidate === 'number' && candidate > 0) {
+      return candidate;
+    }
+  }
+  const rawPid = (transport as unknown as { _process?: { pid?: number } | null | undefined })._process?.pid;
+  return typeof rawPid === 'number' && rawPid > 0 ? rawPid : null;
+}
+
+// ensureProcessTerminated tears down any remaining processes for a given PID.
+async function ensureProcessTerminated(logger: RuntimeLogger, pid: number): Promise<void> {
+  await ensureProcessTreeTerminated(logger, pid);
+}
+
+// waitForChildClose resolves once the child process emits close/error or the timeout elapses.
+async function waitForChildClose(child: ChildProcess, timeoutMs: number): Promise<void> {
+  if ((child as { exitCode?: number | null }).exitCode !== null && (child as { exitCode?: number | null }).exitCode !== undefined) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const cleanup = () => {
+      child.removeListener('close', finish);
+      child.removeListener('error', finish);
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+    child.once('close', finish);
+    child.once('error', finish);
+    let timer: NodeJS.Timeout | undefined;
+    if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      timer = setTimeout(finish, timeoutMs);
+      timer.unref?.();
+    }
+  });
+}
+
+// isProcessAlive returns true when the target PID still exists.
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// createConsoleLogger produces the default runtime logger honoring MCPORTER_LOG_LEVEL.
 function createConsoleLogger(level: LogLevel = resolveLogLevelFromEnv()): RuntimeLogger {
   return createPrefixedConsoleLogger('mcporter', level);
 }
 
+// ensureProcessTreeTerminated gracefully escalates signals until the process tree exits.
+async function ensureProcessTreeTerminated(logger: RuntimeLogger, rootPid: number): Promise<void> {
+  if (!isProcessAlive(rootPid)) {
+    return;
+  }
+
+  let targets = await collectProcessTreePids(rootPid);
+  if (await waitForTreeExit(targets, 300)) {
+    return;
+  }
+
+  await sendSignalToTargets(targets, 'SIGTERM');
+  targets = await collectProcessTreePids(rootPid);
+  if (await waitForTreeExit(targets, 700)) {
+    return;
+  }
+
+  targets = await collectProcessTreePids(rootPid);
+  await sendSignalToTargets(targets, 'SIGKILL');
+  if (await waitForTreeExit(targets, 500)) {
+    return;
+  }
+
+  logger.warn(`Process tree rooted at pid=${rootPid} did not exit after SIGKILL.`);
+}
+
+// sendSignalToTargets deduplicates PIDs and delivers the requested signal.
+async function sendSignalToTargets(pids: number[], signal: NodeJS.Signals): Promise<void> {
+  const seen = new Set<number>();
+  for (const pid of pids) {
+    if (seen.has(pid)) {
+      continue;
+    }
+    seen.add(pid);
+    sendSignal(pid, signal);
+  }
+}
+
+// sendSignal safely sends a signal while tolerating already-exited processes.
+function sendSignal(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(pid, signal);
+  } catch (error) {
+    if (typeof error === 'object' && error && 'code' in error && (error as { code?: string }).code === 'ESRCH') {
+      return;
+    }
+    throw error;
+  }
+}
+
+// listDescendantPids enumerates child processes for the provided root PID.
+async function listDescendantPids(rootPid: number): Promise<number[]> {
+  if (!isProcessAlive(rootPid)) {
+    return [];
+  }
+  if (process.platform === 'win32') {
+    // TODO: implement Windows process tree enumeration if/when needed.
+    return [];
+  }
+
+  try {
+    const { stdout } = await execFileAsync('ps', ['-eo', 'pid=,ppid=']);
+    const children = new Map<number, number[]>();
+    for (const line of stdout.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const [pidText, ppidText] = trimmed.split(/\s+/, 2);
+      const pid = Number.parseInt(pidText ?? '', 10);
+      const ppid = Number.parseInt(ppidText ?? '', 10);
+      if (!Number.isFinite(pid) || !Number.isFinite(ppid)) {
+        continue;
+      }
+      const bucket = children.get(ppid) ?? [];
+      bucket.push(pid);
+      children.set(ppid, bucket);
+    }
+
+    const result: number[] = [];
+    const queue = [...(children.get(rootPid) ?? [])];
+    const seen = new Set<number>(queue);
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === undefined) {
+        continue;
+      }
+      result.push(current);
+      for (const child of children.get(current) ?? []) {
+        if (!seen.has(child)) {
+          seen.add(child);
+          queue.push(child);
+        }
+      }
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+// execFileAsync wraps execFile in a promise for simpler async/await usage.
+function execFileAsync(command: string, args: readonly string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, { encoding: 'utf8' }, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+// collectProcessTreePids returns the root PID and all discovered descendants.
+async function collectProcessTreePids(rootPid: number): Promise<number[]> {
+  const descendants = await listDescendantPids(rootPid);
+  return [...descendants, rootPid];
+}
+
+// waitForTreeExit polls until every PID exits or the timeout expires.
+async function waitForTreeExit(pids: number[], durationMs: number): Promise<boolean> {
+  const deadline = Date.now() + durationMs;
+  while (true) {
+    if (pids.every((pid) => !isProcessAlive(pid))) {
+      return true;
+    }
+    if (Date.now() >= deadline) {
+      return false;
+    }
+    const remaining = Math.max(10, Math.min(100, deadline - Date.now()));
+    await delay(remaining);
+  }
+}
+
+// delay resolves after the specified milliseconds, allowing unref to avoid holding the event loop.
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    if (typeof (timer as { unref?: () => void }).unref === 'function') {
+      (timer as { unref?: () => void }).unref?.();
+    }
+  });
+}
+
+// materializeHeaders resolves environment placeholders in header definitions for a server.
 function materializeHeaders(
   headers: Record<string, string> | undefined,
   serverName: string
@@ -379,6 +621,7 @@ function materializeHeaders(
   return resolved;
 }
 
+// readJsonFile reads JSON from disk, returning undefined when the file does not exist.
 export async function readJsonFile<T = unknown>(filePath: string): Promise<T | undefined> {
   try {
     const content = await fs.readFile(filePath, 'utf8');
@@ -391,6 +634,7 @@ export async function readJsonFile<T = unknown>(filePath: string): Promise<T | u
   }
 }
 
+// writeJsonFile writes pretty-printed JSON to disk, creating parent directories automatically.
 export async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');

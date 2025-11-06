@@ -74,6 +74,7 @@ async function readJsonFile<T>(filePath: string): Promise<T | undefined> {
   }
 }
 
+// writeJsonFile persists JSON data to disk, creating parent directories as needed.
 async function writeJsonFile(filePath: string, data: unknown) {
   await ensureDirectory(path.dirname(filePath));
   await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
@@ -305,8 +306,8 @@ export interface OAuthSession {
   close: () => Promise<void>;
 }
 
+// createOAuthSession spins up a file-backed OAuth provider and callback server for the target definition.
 export async function createOAuthSession(definition: ServerDefinition, logger: OAuthLogger): Promise<OAuthSession> {
-  // createOAuthSession spins up a temporary callback server and file-backed provider for OAuth flows.
   const { provider, close } = await FileOAuthClientProvider.create(definition, logger);
   const waitForAuthorizationCode = () => provider.waitForAuthorizationCode();
   return {

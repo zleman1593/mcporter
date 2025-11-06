@@ -25,6 +25,7 @@ export interface ServerProxyOptions {
   readonly initialSchemas?: Record<string, unknown>;
 }
 
+// defaultToolNameMapper converts camelCase property access into kebab-case tool names.
 function defaultToolNameMapper(propertyKey: string | symbol): string {
   if (typeof propertyKey !== 'string') {
     throw new TypeError('Tool name must be a string when using server proxy.');
@@ -32,14 +33,17 @@ function defaultToolNameMapper(propertyKey: string | symbol): string {
   return propertyKey.replace(/([a-z\d])([A-Z])/g, '$1-$2').toLowerCase();
 }
 
+// canonicalizeToolName strips punctuation for loose matching of tool names.
 function canonicalizeToolName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// isPlainObject narrows unknown values to plain object records.
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+// createToolSchemaInfo normalizes schema metadata used for argument mapping.
 function createToolSchemaInfo(schemaRaw: unknown): ToolSchemaInfo | undefined {
   if (!schemaRaw || typeof schemaRaw !== 'object') {
     return undefined;
@@ -74,6 +78,7 @@ function createToolSchemaInfo(schemaRaw: unknown): ToolSchemaInfo | undefined {
   };
 }
 
+// applyDefaults merges JSON-schema default values into the provided arguments.
 function applyDefaults(meta: ToolSchemaInfo, args?: ToolArguments): ToolArguments {
   const propertiesRaw = meta.schema.properties;
   if (!propertiesRaw || typeof propertiesRaw !== 'object') {
@@ -100,6 +105,7 @@ function applyDefaults(meta: ToolSchemaInfo, args?: ToolArguments): ToolArgument
   return result as ToolArguments;
 }
 
+// validateRequired ensures all schema-required fields are present before invocation.
 function validateRequired(meta: ToolSchemaInfo, args?: ToolArguments): void {
   if (meta.requiredKeys.length === 0) {
     return;
@@ -113,6 +119,7 @@ function validateRequired(meta: ToolSchemaInfo, args?: ToolArguments): void {
   }
 }
 
+// createServerProxy returns a proxy that maps property access to MCP tool invocations.
 export function createServerProxy(
   runtime: Runtime,
   serverName: string,
@@ -164,6 +171,7 @@ export function createServerProxy(
     persistPromise = persistSchemas();
   }
 
+  // consumePersist waits for any in-flight disk persistence to finish before reading from cache maps.
   async function consumePersist(): Promise<void> {
     if (!persistPromise) {
       return;
@@ -175,6 +183,7 @@ export function createServerProxy(
     }
   }
 
+  // ensureMetadata loads schema information for the requested tool, optionally refreshing from the server.
   async function ensureMetadata(toolName: string): Promise<ToolSchemaInfo | undefined> {
     await consumePersist();
     const cached = toolSchemaCache.get(toolName);
@@ -217,6 +226,7 @@ export function createServerProxy(
     return toolSchemaCache.get(toolName);
   }
 
+  // storeSchema caches schema info locally and records aliases for lookup.
   function storeSchema(key: string, schemaRaw: unknown) {
     const info = createToolSchemaInfo(schemaRaw);
     if (!info) {
@@ -240,6 +250,7 @@ export function createServerProxy(
     }
   }
 
+  // loadSchemasFromDisk hydrates the in-memory cache from the persisted schema snapshot.
   async function loadSchemasFromDisk(definition: ReturnType<Runtime['getDefinition']>): Promise<void> {
     try {
       const snapshot = await readSchemaCache(definition);
@@ -254,6 +265,7 @@ export function createServerProxy(
     }
   }
 
+  // persistSchemas writes cached schema data to disk when enabled.
   function persistSchemas(): Promise<void> | null {
     if (!cacheSchemas || !definitionForCache || persistedSchemas.size === 0) {
       return null;

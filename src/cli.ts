@@ -29,16 +29,19 @@ type ProcessWithHandles = NodeJS.Process & {
   _getActiveRequests?: () => unknown[];
 };
 
+// logInfo forwards informational messages through the active logger.
 function logInfo(message: string) {
   // Log an info-level message with the standard prefix.
   activeLogger.info(message);
 }
 
+// logWarn emits warning-level messages with the standard prefix.
 function logWarn(message: string) {
   // Emit a warning with the standard prefix.
   activeLogger.warn(message);
 }
 
+// logError reports errors and optional failure objects through the active logger.
 function logError(message: string, error?: unknown) {
   // Output an error message and optional error object.
   activeLogger.error(message, error);
@@ -56,6 +59,7 @@ const isCI = Boolean(process.env.CI && process.env.CI !== '0' && process.env.CI.
 const spinnerDisabled = process.env.MCPORTER_NO_SPINNER === '1';
 const supportsSpinner = Boolean(stdoutStream?.isTTY && !isCI && !spinnerDisabled);
 
+// colorize wraps a string in ANSI color codes when output supports them.
 function colorize(code: number, text: string): string {
   if (!supportsAnsiColor) {
     return text;
@@ -191,6 +195,7 @@ interface GenerateFlags {
   minify: boolean;
 }
 
+// parseGenerateFlags extracts generate-cli specific flags from argv.
 function parseGenerateFlags(args: string[]): GenerateFlags {
   let server: string | undefined;
   let name: string | undefined;
@@ -297,6 +302,7 @@ function parseGenerateFlags(args: string[]): GenerateFlags {
   };
 }
 
+// expectValue asserts that a flag is followed by a value.
 function expectValue(flag: string, value: string | undefined): string {
   if (value === undefined) {
     throw new Error(`Flag '${flag}' requires a value.`);
@@ -308,6 +314,7 @@ const DEFAULT_LIST_TIMEOUT_MS = 30_000;
 const DEFAULT_CALL_TIMEOUT_MS = 60_000;
 const DEBUG_HANG = process.env.MCPORTER_DEBUG_HANG === '1';
 
+// parseTimeout reads timeout values from strings while honoring defaults.
 function parseTimeout(raw: string | undefined, fallback: number): number {
   if (!raw) {
     return fallback;
@@ -321,6 +328,7 @@ function parseTimeout(raw: string | undefined, fallback: number): number {
 
 const LIST_TIMEOUT_MS = parseTimeout(process.env.MCPORTER_LIST_TIMEOUT, DEFAULT_LIST_TIMEOUT_MS);
 
+// resolveCallTimeout decides the call timeout based on environment overrides.
 export function resolveCallTimeout(override?: number): number {
   if (typeof override === 'number' && Number.isFinite(override) && override > 0) {
     return override;
@@ -328,6 +336,7 @@ export function resolveCallTimeout(override?: number): number {
   return parseTimeout(process.env.MCPORTER_CALL_TIMEOUT, DEFAULT_CALL_TIMEOUT_MS);
 }
 
+// withTimeout races a promise against a timeout to avoid hangs.
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   // Race the original promise with a timeout to keep CLI responsive.
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -351,6 +360,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
+// handleGenerateCli parses flags and generates the requested standalone CLI.
 async function handleGenerateCli(args: string[], globalFlags: FlagMap): Promise<void> {
   const parsed = parseGenerateFlags(args);
   const inferredName = parsed.name ?? (parsed.command ? inferNameFromCommand(parsed.command) : undefined);
@@ -393,6 +403,7 @@ interface InspectFlags {
   format: 'text' | 'json';
 }
 
+// parseInspectFlags pulls inspect-cli options from argv.
 function parseInspectFlags(args: string[]): InspectFlags {
   let format: 'text' | 'json' = 'text';
   let index = 0;
@@ -445,6 +456,7 @@ interface RegenerateParseResult {
   dryRun: boolean;
 }
 
+// parseRegenerateFlags collects regenerate-cli overrides and metadata.
 function parseRegenerateFlags(args: string[]): RegenerateParseResult {
   const overrides: RegenerateOverrides = {};
   let dryRun = false;
@@ -537,6 +549,7 @@ function parseRegenerateFlags(args: string[]): RegenerateParseResult {
   return { artifactPath, overrides, dryRun };
 }
 
+// handleInspectCli loads and prints metadata about a generated CLI artifact.
 export async function handleInspectCli(args: string[]): Promise<void> {
   const parsed = parseInspectFlags(args);
   const metadata = await readCliMetadata(parsed.artifactPath);
@@ -576,6 +589,7 @@ export async function handleInspectCli(args: string[]): Promise<void> {
   }
 }
 
+// handleRegenerateCli replays stored metadata to regenerate a CLI artifact.
 export async function handleRegenerateCli(args: string[], globalFlags: FlagMap): Promise<void> {
   const parsed = parseRegenerateFlags(args);
   const metadata = await readCliMetadata(parsed.artifactPath);
@@ -649,7 +663,7 @@ export async function handleRegenerateCli(args: string[], globalFlags: FlagMap):
   }
 }
 
-// handleList prints configured servers and optional tool metadata.
+// inferNameFromCommand derives a friendly CLI name from a command or URL.
 function inferNameFromCommand(command: string): string | undefined {
   const trimmed = command.trim();
   if (!trimmed) {
@@ -692,6 +706,7 @@ function inferNameFromCommand(command: string): string | undefined {
   return candidate.replace(/\.[a-z0-9]+$/i, '');
 }
 
+// handleList prints configured servers and optional tool metadata.
 export async function handleList(runtime: Awaited<ReturnType<typeof createRuntime>>, args: string[]): Promise<void> {
   const flags = extractListFlags(args);
   const target = args.shift();
@@ -809,6 +824,7 @@ type ListSummaryResult =
       durationMs: number;
     };
 
+// renderServerListRow formats list output for a single server result.
 function renderServerListRow(result: ListSummaryResult, timeoutMs: number): { line: string; summary: string } {
   const description = result.server.description ? ` — ${result.server.description}` : '';
   const durationLabel = dimText(`${(result.durationMs / 1000).toFixed(1)}s`);
@@ -848,6 +864,7 @@ function renderServerListRow(result: ListSummaryResult, timeoutMs: number): { li
 }
 
 // handleCall invokes a tool, prints JSON, and optionally tails logs.
+// handleCall invokes a tool, prints the response, and optionally tails logs.
 export async function handleCall(runtime: Awaited<ReturnType<typeof createRuntime>>, args: string[]): Promise<void> {
   const parsed = parseCallArguments(args);
   const selector = parsed.selector;
@@ -935,6 +952,7 @@ export function extractListFlags(args: string[]): { schema: boolean; timeoutMs?:
   return { schema, timeoutMs };
 }
 
+// formatSourceSuffix pretty-prints the origin of a server definition.
 function formatSourceSuffix(source: ServerSource | undefined, inline = false): string {
   if (!source || source.kind !== 'import') {
     return '';
@@ -945,6 +963,7 @@ function formatSourceSuffix(source: ServerSource | undefined, inline = false): s
   return inline ? tinted : ` ${tinted}`;
 }
 
+// formatPathForDisplay rewrites absolute paths into user-friendly display strings.
 function formatPathForDisplay(filePath: string): string {
   const cwd = process.cwd();
   const relative = path.relative(cwd, filePath);
@@ -955,11 +974,47 @@ function formatPathForDisplay(filePath: string): string {
   return displayPath;
 }
 
+// describeHandle produces readable metadata for active handles in debug output.
 function describeHandle(handle: unknown): string {
   if (!handle || (typeof handle !== 'object' && typeof handle !== 'function')) {
     return String(handle);
   }
   const ctor = (handle as { constructor?: { name?: string } }).constructor?.name ?? typeof handle;
+  if (ctor === 'Socket') {
+    try {
+      const socket = handle as { localAddress?: string; localPort?: number; remoteAddress?: string; remotePort?: number };
+      const parts: string[] = ['Socket'];
+      if (socket.localAddress) {
+        parts.push(`local=${socket.localAddress}:${socket.localPort ?? '?'}`);
+      }
+      if (socket.remoteAddress) {
+        parts.push(`remote=${socket.remoteAddress}:${socket.remotePort ?? '?'}`);
+      }
+      if (typeof (socket as { address?: () => { address: string; port: number } | null }).address === 'function') {
+        const addr = (socket as { address?: () => { address: string; port: number } | null }).address?.();
+        if (addr) {
+          parts.push(`addr=${addr.address}:${addr.port}`);
+        }
+      }
+      const host = (handle as { _host?: string })._host;
+      if (host) {
+        parts.push(`host=${host}`);
+      }
+    const pipeName = (handle as { path?: string }).path;
+    if (pipeName) {
+      parts.push(`path=${pipeName}`);
+    }
+    const extraKeys = Reflect.ownKeys(handle as Record<string | symbol, unknown>)
+        .filter((key) => typeof key === 'string' && key.startsWith('_') && !['_events', '_eventsCount'].includes(key))
+        .slice(0, 4) as string[];
+      if (extraKeys.length > 0) {
+        parts.push(`keys=${extraKeys.join(',')}`);
+      }
+      return parts.join(' ');
+    } catch {
+      return ctor;
+    }
+  }
   if (typeof handle === 'object') {
     const pid = (handle as { pid?: number }).pid;
     if (typeof pid === 'number') {
@@ -973,6 +1028,7 @@ function describeHandle(handle: unknown): string {
   return ctor;
 }
 
+// dumpActiveHandles logs currently active handles/requests when debugging hangs.
 function dumpActiveHandles(label: string): void {
   if (!DEBUG_HANG) {
     return;
@@ -989,6 +1045,7 @@ function dumpActiveHandles(label: string): void {
   }
 }
 
+// terminateChildProcesses aggressively cleans up lingering child processes.
 function terminateChildProcesses(label: string): void {
   const proc = process as ProcessWithHandles;
   const handles = proc._getActiveHandles?.() ?? [];
@@ -997,6 +1054,38 @@ function terminateChildProcesses(label: string): void {
       continue;
     }
     const candidate = handle as ChildProcess;
+    const ctor = (handle as { constructor?: { name?: string } }).constructor?.name ?? '';
+    if (ctor === 'Socket' && typeof (handle as { destroy?: () => void }).destroy === 'function') {
+      try {
+        (handle as { destroy?: () => void }).destroy?.();
+        if (typeof (handle as { unref?: () => void }).unref === 'function') {
+          (handle as { unref?: () => void }).unref?.();
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof (candidate.stdout as { destroy?: () => void } | undefined)?.destroy === 'function') {
+      try {
+        (candidate.stdout as { destroy?: () => void }).destroy?.();
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof (candidate.stderr as { destroy?: () => void } | undefined)?.destroy === 'function') {
+      try {
+        (candidate.stderr as { destroy?: () => void }).destroy?.();
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof (candidate.stdin as { end?: () => void } | undefined)?.end === 'function') {
+      try {
+        (candidate.stdin as { end?: () => void }).end?.();
+      } catch {
+        // ignore
+      }
+    }
     if (DEBUG_HANG) {
       logInfo(
         `[debug] inspect child handle: ${describeHandle(handle)} kill=${typeof candidate.kill} killed=${
@@ -1209,6 +1298,7 @@ function tailLogIfRequested(result: unknown, enabled: boolean): void {
   }
 }
 
+// buildGenerateCliCommand reconstructs the generate-cli invocation for logging/dry runs.
 function buildGenerateCliCommand(
   invocation: CliArtifactMetadata['invocation'],
   definition: SerializedServerDefinition,
@@ -1253,6 +1343,7 @@ function buildGenerateCliCommand(
   return tokens.map(shellQuote).join(' ');
 }
 
+// shellQuote safely quotes CLI tokens when reconstructing commands.
 function shellQuote(value: string): string {
   if (/^[A-Za-z0-9_./@%-]+$/.test(value)) {
     return value;
@@ -1308,6 +1399,7 @@ if (process.env.MCPORTER_DISABLE_AUTORUN !== '1') {
     process.exit(1);
   });
 }
+// handleAuth clears cached tokens and executes standalone OAuth flows.
 async function handleAuth(runtime: Awaited<ReturnType<typeof createRuntime>>, args: string[]): Promise<void> {
   // Peel off optional flags before we consume positional args.
   const resetIndex = args.indexOf('--reset');

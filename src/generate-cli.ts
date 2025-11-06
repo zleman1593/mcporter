@@ -42,6 +42,7 @@ interface GeneratedOption {
   defaultValue?: unknown;
 }
 
+// generateCli produces a standalone CLI (and optional bundle/binary) for a given MCP server.
 export async function generateCli(
   options: GenerateCliOptions
 ): Promise<{ outputPath: string; bundlePath?: string; compilePath?: string }> {
@@ -183,6 +184,7 @@ interface CliInvocationSnapshot {
   minify: boolean;
 }
 
+// fileExists checks whether a path currently exists on disk.
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
@@ -192,6 +194,7 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+// ensureInvocationDefaults fills in invocation metadata with definition-derived defaults.
 function ensureInvocationDefaults(
   invocation: CliInvocationSnapshot,
   definition: ServerDefinition
@@ -207,6 +210,7 @@ function ensureInvocationDefaults(
   };
 }
 
+// resolveServerDefinition finds (or parses inline) the target server definition to generate from.
 async function resolveServerDefinition(
   serverRef: string,
   configPath?: string,
@@ -264,6 +268,7 @@ async function resolveServerDefinition(
   return { definition: match, name: match.name };
 }
 
+// fetchTools retrieves the server's tool schemas needed to generate option metadata.
 async function fetchTools(
   definition: ServerDefinition,
   serverName: string,
@@ -282,6 +287,7 @@ async function fetchTools(
   }
 }
 
+// buildToolMetadata derives CLI-friendly option metadata for a single MCP tool.
 function buildToolMetadata(tool: ServerToolInfo): ToolMetadata {
   const methodName = toProxyMethodName(tool.name);
   const properties = extractOptions(tool);
@@ -292,6 +298,7 @@ function buildToolMetadata(tool: ServerToolInfo): ToolMetadata {
   };
 }
 
+// buildEmbeddedSchemaMap collects the tool schemas for embedding in generated CLIs.
 function buildEmbeddedSchemaMap(tools: ToolMetadata[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const entry of tools) {
@@ -302,6 +309,7 @@ function buildEmbeddedSchemaMap(tools: ToolMetadata[]): Record<string, unknown> 
   return result;
 }
 
+// extractOptions converts a tool's JSON schema into CLI option descriptors.
 function extractOptions(tool: ServerToolInfo): GeneratedOption[] {
   const schema = tool.inputSchema;
   if (!schema || typeof schema !== 'object') {
@@ -333,6 +341,7 @@ function extractOptions(tool: ServerToolInfo): GeneratedOption[] {
   });
 }
 
+// getEnumValues extracts enum values from schema descriptors when present.
 function getEnumValues(descriptor: unknown): string[] | undefined {
   if (!descriptor || typeof descriptor !== 'object') {
     return undefined;
@@ -352,6 +361,7 @@ function getEnumValues(descriptor: unknown): string[] | undefined {
   return undefined;
 }
 
+// getDescriptorDefault returns any default value encoded in a schema descriptor.
 function getDescriptorDefault(descriptor: unknown): unknown {
   if (!descriptor || typeof descriptor !== 'object') {
     return undefined;
@@ -366,6 +376,7 @@ function getDescriptorDefault(descriptor: unknown): unknown {
   return undefined;
 }
 
+// buildPlaceholder creates the usage placeholder text for a CLI option.
 function buildPlaceholder(property: string, type: GeneratedOption['type'], enumValues?: string[]): string {
   const normalized = property.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`).replace(/_/g, '-');
   if (enumValues && enumValues.length > 0) {
@@ -383,6 +394,7 @@ function buildPlaceholder(property: string, type: GeneratedOption['type'], enumV
   }
 }
 
+// buildExampleValue fabricates a sample value for documentation when possible.
 function buildExampleValue(
   property: string,
   type: GeneratedOption['type'],
@@ -424,6 +436,7 @@ export const __test = {
   buildExampleValue,
 };
 
+// inferType maps JSON schema descriptors to simplified CLI option types.
 function inferType(descriptor: unknown): GeneratedOption['type'] {
   if (!descriptor || typeof descriptor !== 'object') {
     return 'unknown';
@@ -435,6 +448,7 @@ function inferType(descriptor: unknown): GeneratedOption['type'] {
   return 'unknown';
 }
 
+// getDescriptorDescription extracts the human-readable description field when present.
 function getDescriptorDescription(descriptor: unknown): string | undefined {
   if (typeof descriptor !== 'object' || descriptor === null) {
     return undefined;
@@ -443,12 +457,14 @@ function getDescriptorDescription(descriptor: unknown): string | undefined {
   return typeof record.description === 'string' ? (record.description as string) : undefined;
 }
 
+// toProxyMethodName converts kebab-case tool names to camelCase proxy methods.
 function toProxyMethodName(toolName: string): string {
   return toolName
     .replace(/[-_](\w)/g, (_, char: string) => char.toUpperCase())
     .replace(/^(\w)/, (match) => match.toLowerCase());
 }
 
+// toCliOption converts schema property names into CLI flag syntax.
 function toCliOption(property: string): string {
   return property.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`).replace(/_/g, '-');
 }
@@ -461,6 +477,7 @@ type DefinitionInput =
       args?: unknown;
     });
 
+// normalizeDefinition coerces JSON inputs into a fully-typed ServerDefinition.
 function normalizeDefinition(def: DefinitionInput): ServerDefinition {
   if (isServerDefinition(def)) {
     return def;
@@ -519,6 +536,7 @@ function normalizeDefinition(def: DefinitionInput): ServerDefinition {
   throw new Error('Server definition must include command information.');
 }
 
+// isServerDefinition performs a runtime check for already-normalized server definitions.
 function isServerDefinition(value: unknown): value is ServerDefinition {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -530,6 +548,7 @@ function isServerDefinition(value: unknown): value is ServerDefinition {
   return isCommandSpec(record.command);
 }
 
+// isCommandSpec validates that an object matches the CommandSpec union.
 function isCommandSpec(value: unknown): value is ServerDefinition['command'] {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -544,6 +563,7 @@ function isCommandSpec(value: unknown): value is ServerDefinition['command'] {
   return false;
 }
 
+// normalizeCommand merges optional headers and ensures command fields are normalized.
 function normalizeCommand(
   command: ServerDefinition['command'],
   headers?: Record<string, string>
@@ -567,6 +587,7 @@ function normalizeCommand(
   };
 }
 
+// toCommandSpec constructs a CommandSpec from raw command and args inputs.
 function toCommandSpec(
   command: string,
   args?: string[],
@@ -589,6 +610,7 @@ function toCommandSpec(
   return stdio;
 }
 
+// getStringArray safely extracts string arrays from unknown values.
 function getStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
@@ -597,6 +619,7 @@ function getStringArray(value: unknown): string[] | undefined {
   return entries.length > 0 ? entries : undefined;
 }
 
+// toStringRecord converts object-like values into string-to-string records.
 function toStringRecord(value: unknown): Record<string, string> | undefined {
   if (typeof value !== 'object' || value === null) {
     return undefined;
@@ -610,6 +633,7 @@ function toStringRecord(value: unknown): Record<string, string> | undefined {
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+// readPackageMetadata loads the package name/version for embedding in generated files.
 async function readPackageMetadata(): Promise<{
   name: string;
   version: string;
@@ -637,6 +661,7 @@ interface TemplateInput {
   generator: { name: string; version: string };
 }
 
+// writeTemplate renders and writes the primary TypeScript template for the generated CLI.
 async function writeTemplate(input: TemplateInput): Promise<string> {
   const defaultName = `${input.serverName}.ts`;
   const output = input.outputPath ?? defaultName;
@@ -645,6 +670,7 @@ async function writeTemplate(input: TemplateInput): Promise<string> {
   return output;
 }
 
+// renderTemplate builds the TypeScript source string for the generated CLI.
 function renderTemplate({ runtimeKind, timeoutMs, definition, serverName, tools, generator }: TemplateInput): string {
   const imports = [
     "import { Command } from 'commander';",
@@ -719,6 +745,7 @@ program.parseAsync(process.argv).catch((error) => {
 	process.exit(1);
 });
 
+// ensureRuntime resolves a runtime instance based on CLI flags or embedded definition.
 async function ensureRuntime(globalOptions: { config?: string; server?: string; timeout: number }) {
 	if (globalOptions.config) {
 		const runtime = await createRuntime({ configPath: globalOptions.config });
@@ -733,6 +760,7 @@ async function ensureRuntime(globalOptions: { config?: string; server?: string; 
 	return { runtime, serverName: embeddedName, usingEmbedded: true };
 }
 
+// invokeWithTimeout enforces per-command timeouts for generated CLI calls.
 async function invokeWithTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
 	return await Promise.race([
 		promise,
@@ -742,6 +770,7 @@ async function invokeWithTimeout<T>(promise: Promise<T>, timeout: number): Promi
 	]);
 }
 
+// printResult formats tool responses according to the requested output mode.
 function printResult(result: unknown, format: string) {
 	const wrapped = createCallResult(result);
 	switch (format) {
@@ -774,6 +803,7 @@ function printResult(result: unknown, format: string) {
 	}
 }
 
+// normalizeEmbeddedServer revives the embedded server definition into runtime-friendly structures.
 function normalizeEmbeddedServer(server: typeof embeddedServer) {
 	const base = { ...server } as Record<string, unknown>;
 	if ((server.command as any).kind === 'http') {
@@ -801,6 +831,7 @@ function normalizeEmbeddedServer(server: typeof embeddedServer) {
 `;
 }
 
+// renderToolCommand assembles the Commander command block for a single tool.
 function renderToolCommand(
   tool: ToolMetadata,
   defaultTimeout: number
@@ -854,6 +885,7 @@ ${optionLines ? `\n${optionLines}` : ''}
   return { block, commandName, signature };
 }
 
+// renderOption builds the Commander option line for a generated tool flag.
 function renderOption(option: GeneratedOption): string {
   const flag = `--${option.cliName} ${option.placeholder}`;
   let description = option.description ? option.description : `Set ${option.property}.`;
@@ -877,6 +909,7 @@ function renderOption(option: GeneratedOption): string {
   return `	${base}`;
 }
 
+// buildExampleInvocation crafts a sample CLI invocation for help text.
 function buildExampleInvocation(commandName: string, options: GeneratedOption[]): string | undefined {
   const required = options.filter((option) => option.required);
   const chosen = required.length > 0 ? required : options.slice(0, Math.min(options.length, 2));
@@ -889,6 +922,7 @@ function buildExampleInvocation(commandName: string, options: GeneratedOption[])
   return JSON.stringify(parts.join(' '));
 }
 
+// pickExampleValue chooses a representative value for examples/help output.
 function pickExampleValue(option: GeneratedOption): string {
   if (option.exampleValue) {
     return option.exampleValue;
@@ -915,6 +949,7 @@ function pickExampleValue(option: GeneratedOption): string {
   }
 }
 
+// formatHelpValue makes option defaults human-readable in generated help text.
 function formatHelpValue(value: unknown): string {
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry)).join(', ');
@@ -928,6 +963,7 @@ function formatHelpValue(value: unknown): string {
   return String(value);
 }
 
+// optionParser produces Commander parser functions matched to option types.
 function optionParser(option: GeneratedOption): string | undefined {
   switch (option.type) {
     case 'number':
@@ -941,6 +977,7 @@ function optionParser(option: GeneratedOption): string | undefined {
   }
 }
 
+// bundleOutput bundles the generated template into a single JavaScript file via esbuild.
 async function bundleOutput({
   sourcePath,
   targetPath,
@@ -969,6 +1006,7 @@ async function bundleOutput({
   return absTarget;
 }
 
+// compileBundleWithBun invokes Bun to compile the bundled output into a native binary.
 async function compileBundleWithBun(bundlePath: string, outputPath: string): Promise<void> {
   const bunBin = await verifyBunAvailable();
   await new Promise<void>((resolve, reject) => {
@@ -1018,8 +1056,7 @@ function resolveBundleTarget({
   throw new Error('--compile requires an explicit bundle target.');
 }
 
-// computeCompileTarget picks the final binary output location, defaulting to the bundle basename.
-
+// computeCompileTarget selects the final binary output path, defaulting to the bundle basename.
 function computeCompileTarget(
   compileOption: GenerateCliOptions['compile'],
   bundlePath: string,
@@ -1033,6 +1070,7 @@ function computeCompileTarget(
   return path.join(parsed.dir, base);
 }
 
+// resolveRuntimeKind decides whether generation should target Node or Bun.
 async function resolveRuntimeKind(
   runtimeOption: GenerateCliOptions['runtime'],
   compileOption: GenerateCliOptions['compile']
@@ -1047,6 +1085,7 @@ async function resolveRuntimeKind(
   return bunAvailable ? 'bun' : 'node';
 }
 
+// isBunAvailable checks if Bun can be executed in the current environment.
 async function isBunAvailable(): Promise<boolean> {
   try {
     await verifyBunAvailable();
@@ -1056,6 +1095,7 @@ async function isBunAvailable(): Promise<boolean> {
   }
 }
 
+// verifyBunAvailable resolves the Bun binary path and ensures it is runnable.
 async function verifyBunAvailable(): Promise<string> {
   const bunBin = process.env.BUN_BIN ?? 'bun';
   await new Promise<void>((resolve, reject) => {

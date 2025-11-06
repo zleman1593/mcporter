@@ -7,6 +7,7 @@ export interface CallResult<T = unknown> {
   structuredContent(): unknown;
 }
 
+// extractContentArray pulls the `content` array from MCP response envelopes.
 function extractContentArray(raw: unknown): unknown[] | null {
   if (
     raw &&
@@ -19,6 +20,7 @@ function extractContentArray(raw: unknown): unknown[] | null {
   return null;
 }
 
+// extractStructuredContent returns the structuredContent field when present.
 function extractStructuredContent(raw: unknown): unknown {
   if (raw && typeof raw === 'object' && 'structuredContent' in (raw as Record<string, unknown>)) {
     return (raw as Record<string, unknown>).structuredContent;
@@ -26,6 +28,7 @@ function extractStructuredContent(raw: unknown): unknown {
   return null;
 }
 
+// asString converts known content/value shapes into plain strings.
 function asString(value: unknown): string | null {
   if (typeof value === 'string') {
     return value;
@@ -37,6 +40,7 @@ function asString(value: unknown): string | null {
   return null;
 }
 
+// collectText flattens all text/markdown entries into a joined string.
 function collectText(content: unknown[], joiner: string): string | null {
   const pieces: string[] = [];
   for (const entry of content) {
@@ -56,6 +60,7 @@ function collectText(content: unknown[], joiner: string): string | null {
   return null;
 }
 
+// tryParseJson pulls JSON payloads out of structured responses or raw strings.
 function tryParseJson(value: unknown): unknown {
   if (!value) {
     return null;
@@ -78,6 +83,7 @@ function tryParseJson(value: unknown): unknown {
   return null;
 }
 
+// createCallResult wraps a tool response with helpers for common content types.
 export function createCallResult<T = unknown>(raw: T): CallResult<T> {
   return {
     raw,

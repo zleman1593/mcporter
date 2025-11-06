@@ -4,6 +4,7 @@ const ENV_DEFAULT_PATTERN = /^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-|:|-)?([^}]*)\}$/
 const ENV_INTERPOLATION_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 const ENV_DIRECT_PREFIX = '$env:';
 
+// expandHome replaces a leading '~' with the current user's home directory.
 export function expandHome(input: string): string {
   if (!input.startsWith('~')) {
     return input;
@@ -18,6 +19,7 @@ export function expandHome(input: string): string {
   return input;
 }
 
+// resolveEnvValue interprets ${VAR:-default} syntax and other primitive values for env overrides.
 export function resolveEnvValue(raw: unknown): string {
   if (typeof raw !== 'string') {
     return String(raw);
@@ -44,6 +46,7 @@ export function resolveEnvValue(raw: unknown): string {
   return raw;
 }
 
+// resolveEnvPlaceholders replaces ${VAR} or $env:VAR references using process.env, enforcing required values.
 export function resolveEnvPlaceholders(value: string): string {
   if (value.startsWith(ENV_DIRECT_PREFIX)) {
     const envName = value.slice(ENV_DIRECT_PREFIX.length);
@@ -72,6 +75,7 @@ export function resolveEnvPlaceholders(value: string): string {
   return replaced;
 }
 
+// withEnvOverrides temporarily populates process.env keys while executing the provided callback.
 export async function withEnvOverrides<T>(
   envOverrides: Record<string, string> | undefined,
   fn: () => Promise<T> | T

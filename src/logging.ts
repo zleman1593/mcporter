@@ -21,6 +21,7 @@ export interface Logger {
   debug?(message: string): void;
 }
 
+// parseLogLevel normalizes arbitrary input into one of the supported log level keywords.
 export function parseLogLevel(value: string | undefined, defaultLevel: LogLevel = 'warn'): LogLevel {
   if (!value) {
     return defaultLevel;
@@ -40,6 +41,7 @@ export function parseLogLevel(value: string | undefined, defaultLevel: LogLevel 
   return candidate;
 }
 
+// resolveLogLevelFromEnv reads MCPORTER_LOG_LEVEL and falls back to the provided default when invalid.
 export function resolveLogLevelFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   defaultLevel: LogLevel = 'warn'
@@ -54,10 +56,12 @@ export function resolveLogLevelFromEnv(
   }
 }
 
+// shouldLog determines whether a candidate level passes the configured threshold.
 function shouldLog(level: LogLevel, threshold: LogLevel): boolean {
   return LOG_LEVEL_ORDER[level] >= LOG_LEVEL_ORDER[threshold];
 }
 
+// createPrefixedConsoleLogger wraps console.* with a consistent prefix and level filtering.
 export function createPrefixedConsoleLogger(prefix: string, level: LogLevel): Logger {
   const threshold = parseLogLevel(level);
   const format = (message: string) => `[${prefix}] ${message}`;

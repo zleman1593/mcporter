@@ -15,6 +15,7 @@ interface Options {
   readonly output?: string;
 }
 
+// parseArgs walks CLI flags and produces normalized build options.
 function parseArgs(argv: string[]): Options {
   let target: string | undefined;
   let bytecode = false;
@@ -48,6 +49,7 @@ function parseArgs(argv: string[]): Options {
   return { target, bytecode, minify, output };
 }
 
+// requireValue asserts that a flag includes a value.
 function requireValue(flag: string, value: string | undefined): string {
   if (!value) {
     throw new Error(`${flag} requires a value`);
@@ -55,9 +57,13 @@ function requireValue(flag: string, value: string | undefined): string {
   return value;
 }
 
+// main orchestrates the Bun compile flow for the mcporter binary.
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  const projectRoot = path.join(import.meta.dir, '..');
+  const projectRoot = path.join(
+    fs.realpathSync(path.dirname(new URL(import.meta.url).pathname)),
+    '..'
+  );
   const distDir = path.join(projectRoot, 'dist-bun');
   if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir, { recursive: true });

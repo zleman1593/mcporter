@@ -67,6 +67,7 @@ export interface WriteCliMetadataOptions {
   readonly invocation: CliArtifactMetadata['invocation'];
 }
 
+// writeCliMetadata persists CLI build metadata next to the generated artifact and returns the metadata path.
 export async function writeCliMetadata(options: WriteCliMetadataOptions): Promise<string> {
   const metadata: CliArtifactMetadata = {
     schemaVersion: 1,
@@ -90,16 +91,19 @@ export async function writeCliMetadata(options: WriteCliMetadataOptions): Promis
   return metadataPath;
 }
 
+// metadataPathForArtifact derives the metadata file path for a given artifact output path.
 export function metadataPathForArtifact(artifactPath: string): string {
   return `${artifactPath}.metadata.json`;
 }
 
+// readCliMetadata reads the persisted metadata file for a generated CLI artifact.
 export async function readCliMetadata(artifactPath: string): Promise<CliArtifactMetadata> {
   const target = metadataPathForArtifact(artifactPath);
   const buffer = await fs.readFile(target, 'utf8');
   return JSON.parse(buffer) as CliArtifactMetadata;
 }
 
+// serializeDefinition converts an in-memory server definition into the metadata-friendly JSON form.
 export function serializeDefinition(definition: ServerDefinition): SerializedServerDefinition {
   if (definition.command.kind === 'http') {
     return {

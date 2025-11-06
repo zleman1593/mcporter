@@ -77,6 +77,7 @@ export interface LoadConfigOptions {
   readonly rootDir?: string;
 }
 
+// loadServerDefinitions reads mcporter configs (and imports) into normalized server definitions.
 export async function loadServerDefinitions(options: LoadConfigOptions = {}): Promise<ServerDefinition[]> {
   const rootDir = options.rootDir ?? process.cwd();
   const configPath = resolveConfigPath(options.configPath, rootDir);
@@ -129,6 +130,7 @@ type RawConfig = z.infer<typeof RawConfigSchema>;
 
 type RawEntryMap = Map<string, RawEntry>;
 
+// resolveConfigPath determines the effective config file path based on overrides and root directory.
 function resolveConfigPath(configPath: string | undefined, rootDir: string): string {
   if (configPath) {
     return path.resolve(configPath);
@@ -136,11 +138,13 @@ function resolveConfigPath(configPath: string | undefined, rootDir: string): str
   return path.resolve(rootDir, 'config', 'mcporter.json');
 }
 
+// readConfigFile loads and validates the primary mcporter.json contents.
 async function readConfigFile(configPath: string): Promise<RawConfig> {
   const buffer = await fs.readFile(configPath, 'utf8');
   return RawConfigSchema.parse(JSON.parse(buffer));
 }
 
+// normalizeServerEntry merges a raw config entry into a runtime-ready server definition.
 function normalizeServerEntry(name: string, raw: RawEntry, baseDir: string, source: ServerSource): ServerDefinition {
   const description = raw.description;
   const env = raw.env ? { ...raw.env } : undefined;
@@ -188,6 +192,7 @@ function normalizeServerEntry(name: string, raw: RawEntry, baseDir: string, sour
   };
 }
 
+// normalizeAuth filters auth values down to the supported keywords.
 function normalizeAuth(auth: string | undefined): string | undefined {
   if (!auth) {
     return undefined;
@@ -198,6 +203,7 @@ function normalizeAuth(auth: string | undefined): string | undefined {
   return undefined;
 }
 
+// normalizePath expands home-dir tokens for filesystem paths when present.
 function normalizePath(input: string | undefined): string | undefined {
   if (!input) {
     return undefined;
@@ -205,10 +211,12 @@ function normalizePath(input: string | undefined): string | undefined {
   return expandHome(input);
 }
 
+// getUrl chooses the HTTP endpoint value from the various accepted config keys.
 function getUrl(raw: RawEntry): string | undefined {
   return raw.baseUrl ?? raw.base_url ?? raw.url ?? raw.serverUrl ?? raw.server_url ?? undefined;
 }
 
+// getCommand resolves stdio command invocations from string or array shapes.
 function getCommand(raw: RawEntry): { command: string; args: string[] } | undefined {
   const commandValue = raw.command ?? raw.executable;
   if (Array.isArray(commandValue)) {
@@ -235,6 +243,7 @@ function getCommand(raw: RawEntry): { command: string; args: string[] } | undefi
   return undefined;
 }
 
+// buildHeaders materializes header values (including bearer tokens) for a raw entry.
 function buildHeaders(raw: RawEntry): Record<string, string> | undefined {
   const headers: Record<string, string> = {};
 
@@ -255,6 +264,7 @@ function buildHeaders(raw: RawEntry): Record<string, string> | undefined {
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
+// readExternalEntries parses imported config files (JSON or TOML) into raw entry maps.
 async function readExternalEntries(filePath: string): Promise<RawEntryMap | null> {
   if (!(await fileExists(filePath))) {
     return null;
@@ -271,6 +281,7 @@ async function readExternalEntries(filePath: string): Promise<RawEntryMap | null
   return extractFromMcpJson(parsed);
 }
 
+// extractFromMcpJson pulls cursor-style MCP entries into a normalized map.
 function extractFromMcpJson(raw: unknown): RawEntryMap {
   const map = new Map<string, RawEntry>();
   if (!raw || typeof raw !== 'object') {
@@ -295,6 +306,7 @@ function extractFromMcpJson(raw: unknown): RawEntryMap {
   return map;
 }
 
+// extractFromCodexConfig converts Codex TOML structures into the shared raw entry shape.
 function extractFromCodexConfig(raw: Record<string, unknown>): RawEntryMap {
   const map = new Map<string, RawEntry>();
   const serversRaw = raw.mcp_servers;
@@ -315,6 +327,7 @@ function extractFromCodexConfig(raw: Record<string, unknown>): RawEntryMap {
   return map;
 }
 
+// convertExternalEntry rewrites external config objects into the internal RawEntry representation.
 function convertExternalEntry(value: Record<string, unknown>): RawEntry | null {
   const result: Record<string, unknown> = {};
 
@@ -367,6 +380,7 @@ function convertExternalEntry(value: Record<string, unknown>): RawEntry | null {
   return parsed.success ? parsed.data : null;
 }
 
+// buildExternalHeaders collects literal or bearer headers from imported config definitions.
 function buildExternalHeaders(record: Record<string, unknown>): Record<string, string> | undefined {
   const headers: Record<string, string> = {};
 
@@ -388,6 +402,7 @@ function buildExternalHeaders(record: Record<string, unknown>): Record<string, s
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
+// pathsForImport returns the set of candidate files to read for a given import kind.
 function pathsForImport(kind: ImportKind, rootDir: string): string[] {
   switch (kind) {
     case 'cursor':
@@ -407,6 +422,7 @@ function pathsForImport(kind: ImportKind, rootDir: string): string[] {
   }
 }
 
+// defaultCursorUserConfigPath provides the OS-specific Cursor config location.
 function defaultCursorUserConfigPath(): string {
   if (process.platform === 'darwin') {
     return path.join(os.homedir(), '.cursor', 'mcp.json');
@@ -418,6 +434,7 @@ function defaultCursorUserConfigPath(): string {
   return path.join(os.homedir(), '.config', 'Cursor', 'mcp.json');
 }
 
+// defaultClaudeDesktopConfigPath returns the platform-specific Claude desktop config path.
 function defaultClaudeDesktopConfigPath(): string {
   if (process.platform === 'darwin') {
     return path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
@@ -429,6 +446,7 @@ function defaultClaudeDesktopConfigPath(): string {
   return path.join(os.homedir(), '.config', 'Claude', 'claude_desktop_config.json');
 }
 
+// fileExists checks for file presence with graceful failure handling.
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
@@ -438,10 +456,12 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+// asString extracts a non-empty string value from an arbitrary input.
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+// asStringRecord coerces object entries into a string-to-string record.
 function asStringRecord(input: unknown): Record<string, string> | undefined {
   if (!input || typeof input !== 'object') {
     return undefined;
@@ -457,10 +477,12 @@ function asStringRecord(input: unknown): Record<string, string> | undefined {
   return Object.keys(record).length > 0 ? record : undefined;
 }
 
+// toFileUrl converts a filesystem path into a file:// URL.
 export function toFileUrl(filePath: string): URL {
   return pathToFileURL(filePath);
 }
 
+// parseCommandString tokenizes a shell-style command string into argv entries.
 function parseCommandString(value: string): string[] {
   const result: string[] = [];
   let current = '';
