@@ -7,9 +7,9 @@ import path from 'node:path';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { CliArtifactMetadata, SerializedServerDefinition } from './cli-metadata.js';
 import { readCliMetadata } from './cli-metadata.js';
-import type { ServerSource } from './config.js';
+import type { ServerDefinition, ServerSource } from './config.js';
 import { generateCli } from './generate-cli.js';
-import { createRuntime } from './runtime.js';
+import { createRuntime, type ServerToolInfo } from './runtime.js';
 import {
   createPrefixedConsoleLogger,
   parseLogLevel,
@@ -42,6 +42,26 @@ function logError(message: string, error?: unknown) {
   // Output an error message and optional error object.
   activeLogger.error(message, error);
 }
+
+const forceColorRaw = process.env.FORCE_COLOR?.toLowerCase();
+const forceDisableColor = forceColorRaw === '0' || forceColorRaw === 'false';
+const forceEnableColor =
+  forceColorRaw === '1' || forceColorRaw === 'true' || forceColorRaw === '2' || forceColorRaw === '3';
+const hasNoColor = process.env.NO_COLOR !== undefined;
+const stdoutStream = process.stdout as NodeJS.WriteStream | undefined;
+const supportsAnsiColor =
+  !hasNoColor && (forceEnableColor || (!forceDisableColor && Boolean(stdoutStream?.isTTY)));
+
+function colorize(code: number, text: string): string {
+  if (!supportsAnsiColor) {
+    return text;
+  }
+  return `\u001B[${code}m${text}\u001B[0m`;
+}
+
+const dimText = (text: string): string => colorize(90, text);
+const yellowText = (text: string): string => colorize(33, text);
+const redText = (text: string): string => colorize(31, text);
 
 // main parses CLI flags and dispatches to list/call commands.
 async function main(): Promise<void> {
@@ -684,56 +704,38 @@ export async function handleList(runtime: Awaited<ReturnType<typeof createRuntim
 
     console.log(`Listing ${servers.length} server(s) (per-server timeout: ${perServerTimeoutSeconds}s)`);
 
-    const results = await Promise.all(
-      servers.map(async (server) => {
+    const tasks = servers.map((server) => {
+      const task = (async (): Promise<ListSummaryResult> => {
         const startedAt = Date.now();
         try {
-          const tools = await withTimeout(runtime.listTools(server.name, { autoAuthorize: false }), perServerTimeoutMs);
-          const durationMs = Date.now() - startedAt;
+          const tools = await withTimeout(
+            runtime.listTools(server.name, { autoAuthorize: false }),
+            perServerTimeoutMs
+          );
           return {
             server,
             status: 'ok' as const,
             tools,
-            durationMs,
+            durationMs: Date.now() - startedAt,
           };
         } catch (error) {
-          const durationMs = Date.now() - startedAt;
           return {
             server,
             status: 'error' as const,
             error,
-            durationMs,
+            durationMs: Date.now() - startedAt,
           };
         }
-      })
-    );
+      })();
 
-    for (const result of results) {
-      const description = result.server.description ? ` — ${result.server.description}` : '';
-      const durationSeconds = (result.durationMs / 1000).toFixed(1);
-      const sourceSuffix = formatSourceSuffix(result.server.source);
-      if (result.status === 'ok') {
-        const toolSuffix =
-          result.tools.length === 0
-            ? 'no tools reported'
-            : `${result.tools.length === 1 ? '1 tool' : `${result.tools.length} tools`}`;
-        console.log(`- ${result.server.name}${description} (${toolSuffix}, ${durationSeconds}s)${sourceSuffix}`);
-        continue;
-      }
+      task.then((result) => {
+        printServerListResult(result, perServerTimeoutMs);
+      });
 
-      const { error } = result;
-      let note: string;
-      if (error instanceof UnauthorizedError) {
-        note = `auth required — run 'mcporter auth ${result.server.name}' to complete the OAuth flow`;
-      } else if (error instanceof Error && error.message === 'Timeout') {
-        note = `timed out after ${perServerTimeoutSeconds}s`;
-      } else if (error instanceof Error) {
-        note = error.message;
-      } else {
-        note = String(error);
-      }
-      console.log(`- ${result.server.name}${description} (${note}, ${durationSeconds}s)${sourceSuffix}`);
-    }
+      return task;
+    });
+
+    await Promise.all(tasks);
     return;
   }
 
@@ -764,6 +766,53 @@ export async function handleList(runtime: Awaited<ReturnType<typeof createRuntim
     console.warn(`  Tools: <timed out after ${timeoutMs}ms>`);
     console.warn(`  Reason: ${message}`);
   }
+}
+
+type ListSummaryResult =
+  | {
+      status: 'ok';
+      server: ServerDefinition;
+      tools: ServerToolInfo[];
+      durationMs: number;
+    }
+  | {
+      status: 'error';
+      server: ServerDefinition;
+      error: unknown;
+      durationMs: number;
+    };
+
+function printServerListResult(result: ListSummaryResult, timeoutMs: number): void {
+  const description = result.server.description ? ` — ${result.server.description}` : '';
+  const durationLabel = dimText(`${(result.durationMs / 1000).toFixed(1)}s`);
+  const sourceSuffix = formatSourceSuffix(result.server.source);
+  const prefix = `- ${result.server.name}${description}`;
+
+  if (result.status === 'ok') {
+    const toolSuffix =
+      result.tools.length === 0
+        ? 'no tools reported'
+        : `${result.tools.length === 1 ? '1 tool' : `${result.tools.length} tools`}`;
+    console.log(`${prefix} (${toolSuffix}, ${durationLabel})${sourceSuffix}`);
+    return;
+  }
+
+  const timeoutSeconds = Math.round(timeoutMs / 1000);
+  let formatter: (text: string) => string = redText;
+  let note: string;
+  const { error } = result;
+  if (error instanceof UnauthorizedError) {
+    note = `auth required — run 'mcporter auth ${result.server.name}' to complete the OAuth flow`;
+    formatter = yellowText;
+  } else if (error instanceof Error && error.message === 'Timeout') {
+    note = `timed out after ${timeoutSeconds}s`;
+  } else if (error instanceof Error) {
+    note = error.message;
+  } else {
+    note = String(error);
+  }
+
+  console.log(`${prefix} (${formatter(note)}, ${durationLabel})${sourceSuffix}`);
 }
 
 // handleCall invokes a tool, prints JSON, and optionally tails logs.
@@ -859,7 +908,9 @@ function formatSourceSuffix(source: ServerSource | undefined, inline = false): s
     return '';
   }
   const formatted = formatPathForDisplay(source.path);
-  return inline ? formatted : ` [source: ${formatted}]`;
+  const text = inline ? formatted : `[source: ${formatted}]`;
+  const tinted = dimText(text);
+  return inline ? tinted : ` ${tinted}`;
 }
 
 function formatPathForDisplay(filePath: string): string {

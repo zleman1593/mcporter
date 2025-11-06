@@ -13,6 +13,8 @@ _TypeScript runtime + CLI generator for the Model Context Protocol._
 
 ## Installation
 
+### npm / pnpm / yarn
+
 ```bash
 pnpm add mcporter
 # or
@@ -20,6 +22,15 @@ yarn add mcporter
 # or
 npm install mcporter
 ```
+
+### Homebrew (macOS arm64)
+
+```bash
+brew tap steipete/tap
+brew install steipete/tap/mcporter
+```
+
+> Note: Homebrew installation currently ships the Bun-compiled arm64 binary. Intel Macs should use the npm install method or Rosetta.
 
 ## Quick Start
 
