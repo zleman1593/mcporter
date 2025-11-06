@@ -120,10 +120,6 @@ describe('CLI list classification', () => {
     expect(summaryLine).toContain('auth required');
     expect(summaryLine).toContain('offline');
 
-    expect(logLines).toContain('Next steps:');
-    expect(logLines).toContain("  • vercel — run 'mcporter auth vercel'");
-    expect(logLines).toContain("  • github — run 'mcporter auth github'");
-
     logSpy.mockRestore();
     warnSpy.mockRestore();
     process.env.CI = originalCI;

@@ -108,22 +108,12 @@ export async function handleList(
       offline: 0,
       error: 0,
     };
-    const authRecommendations: Array<{ server: string; command: string }> = [];
-    renderedResults.forEach((entry, index) => {
+    renderedResults.forEach((entry) => {
       if (!entry) {
         return;
       }
       const category = (entry as { category?: StatusCategory }).category ?? 'error';
       errorCounts[category] = (errorCounts[category] ?? 0) + 1;
-      if (category === 'auth') {
-        const authCommand = (entry as { authCommand?: string }).authCommand;
-        if (!authCommand) {
-          return;
-        }
-        const serverDefinition = servers[index];
-        const serverLabel = serverDefinition?.name ?? 'unknown';
-        authRecommendations.push({ server: serverLabel, command: authCommand });
-      }
     });
     if (spinnerActive && spinner) {
       spinner.stop();
@@ -136,19 +126,6 @@ export async function handleList(
       ...(errorCounts.error > 0 ? [`${errorCounts.error} errors`] : []),
     ];
     console.log(`✔ Listed ${servers.length} server${servers.length === 1 ? '' : 's'} (${parts.join('; ')}).`);
-
-    if (authRecommendations.length > 0) {
-      console.log('');
-      console.log('Next steps:');
-      const seen = new Set<string>();
-      for (const recommendation of authRecommendations) {
-        if (seen.has(recommendation.command)) {
-          continue;
-        }
-        seen.add(recommendation.command);
-        console.log(`  • ${recommendation.server ?? 'the server'} — run '${recommendation.command}'`);
-      }
-    }
     return;
   }
 
