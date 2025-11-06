@@ -135,6 +135,12 @@ export async function handleList(
   const sourcePath = formatSourceSuffix(definition.source, true);
   const serverLabel = supportsAnsiColor ? `\u001B[1m${target}\u001B[0m` : target;
   console.log(serverLabel);
+  console.log(`  ${dimText('Description:')} ${definition.description ?? '<none>'}`);
+  const transportSummary =
+    definition.command.kind === 'http'
+      ? `HTTP ${definition.command.url instanceof URL ? definition.command.url.href : String(definition.command.url)}`
+      : `STDIO ${[definition.command.command, ...(definition.command.args ?? [])].join(' ')}`.trim();
+  console.log(`  ${dimText('Transport:')} ${transportSummary}`);
   if (sourcePath) {
     console.log(`  Source: ${sourcePath}`);
   }

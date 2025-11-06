@@ -155,6 +155,8 @@ describe('CLI list classification', () => {
 
     const logLines = logSpy.mock.calls.map((call) => call.join(' '));
     expect(logLines.some((line) => line.includes('calculator'))).toBe(true);
+    expect(logLines.some((line) => line.includes('Description:'))).toBe(true);
+    expect(logLines.some((line) => line.includes('Transport:'))).toBe(true);
     expect(logLines.some((line) => line.includes('Add two numbers'))).toBe(true);
     expect(logLines.some((line) => line.includes('Usage: mcporter call calculator.add --a <a:number>'))).toBe(true);
 
