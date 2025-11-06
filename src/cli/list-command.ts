@@ -4,7 +4,7 @@ import type { GeneratedOption } from './generate/tools.js';
 import { extractOptions } from './generate/tools.js';
 import type { ListSummaryResult, StatusCategory } from './list-format.js';
 import { formatSourceSuffix, renderServerListRow } from './list-format.js';
-import { boldText, cyanText, dimText, supportsSpinner } from './terminal.js';
+import { boldText, cyanText, dimText, extraDimText, supportsSpinner } from './terminal.js';
 import { LIST_TIMEOUT_MS, withTimeout } from './timeouts.js';
 
 export function extractListFlags(args: string[]): { schema: boolean; timeoutMs?: number; requiredOnly: boolean } {
@@ -226,7 +226,7 @@ function formatToolSignatureBlock(
 ): string[] {
   const lines: string[] = [];
   if (description) {
-    lines.push(dimText(`// ${description}`));
+    lines.push(extraDimText(`// ${description}`));
   }
   if (options.length === 0) {
     if (totalOptionCount > 0 && requiredOnly) {
@@ -254,7 +254,7 @@ function formatToolSignatureBlock(
 function formatParameterSignature(option: GeneratedOption): string {
   const typeAnnotation = formatTypeAnnotation(option);
   const optionalSuffix = option.required ? '' : '?';
-  const commentSuffix = option.description ? `  ${dimText(`// ${option.description}`)}` : '';
+  const commentSuffix = option.description ? `  ${extraDimText(`// ${option.description}`)}` : '';
   return `${option.property}${optionalSuffix}: ${typeAnnotation}${commentSuffix}`;
 }
 
