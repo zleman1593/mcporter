@@ -26,6 +26,15 @@ export const extraDimText = (text: string): string => {
   return `\u001B[38;5;244m${text}\u001B[0m`;
 };
 
+export const cyanText = (text: string): string => colorize(36, text);
+
+export const boldText = (text: string): string => {
+  if (!supportsAnsiColor) {
+    return text;
+  }
+  return `\u001B[1m${text}\u001B[0m`;
+};
+
 const isCI = Boolean(process.env.CI && process.env.CI !== '0' && process.env.CI.toLowerCase() !== 'false');
 const spinnerDisabled = process.env.MCPORTER_NO_SPINNER === '1';
 

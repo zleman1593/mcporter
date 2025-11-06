@@ -2,7 +2,7 @@ import ora from 'ora';
 import { extractOptions } from './generate/tools.js';
 import type { ListSummaryResult, StatusCategory } from './list-format.js';
 import { formatSourceSuffix, renderServerListRow } from './list-format.js';
-import { dimText, supportsAnsiColor, supportsSpinner } from './terminal.js';
+import { boldText, cyanText, dimText, supportsSpinner } from './terminal.js';
 import { LIST_TIMEOUT_MS, withTimeout } from './timeouts.js';
 
 export function extractListFlags(args: string[]): { schema: boolean; timeoutMs?: number } {
@@ -133,8 +133,7 @@ export async function handleList(
   const definition = runtime.getDefinition(target);
   const timeoutMs = flags.timeoutMs ?? LIST_TIMEOUT_MS;
   const sourcePath = formatSourceSuffix(definition.source, true);
-  const serverLabel = supportsAnsiColor ? `\u001B[1m${target}\u001B[0m` : target;
-  console.log(serverLabel);
+  console.log(boldText(target));
   console.log(`  ${dimText('Description:')} ${definition.description ?? '<none>'}`);
   const transportSummary =
     definition.command.kind === 'http'
@@ -151,8 +150,7 @@ export async function handleList(
       return;
     }
     for (const tool of tools) {
-      const toolName = supportsAnsiColor ? `\u001B[36m${tool.name}\u001B[0m` : tool.name;
-      console.log(`  ${toolName}`);
+      console.log(`  ${cyanText(tool.name)}`);
       if (tool.description) {
         console.log(`    ${dimText('Description:')} ${tool.description}`);
       }
