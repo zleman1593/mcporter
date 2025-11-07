@@ -1,13 +1,17 @@
 # Changelog
 
 ## [Unreleased]
+_Nothing yet._
+
+## [0.3.2] - 2025-11-07
 
 ### CLI
 - Embedded the CLI version so Homebrew/Bun builds respond to `mcporter --version` even when `package.json` is unavailable.
 - Added `tests/cli-version.test.ts` to verify `runCli(['--version'])` falls back to the runtime constant whenever package metadata can’t be read.
+- Improved `generate-cli` so inline stdio commands (e.g., `"npx chrome-devtools-mcp"`) parse correctly even when invoked from empty directories.
 
 ### Code generation
-- `readPackageMetadata()` now tolerates missing `package.json` files, returning `mcporter@0.0.0` instead of throwing so `generate-cli` works from empty directories.
+- `readPackageMetadata()` now tolerates missing `package.json` files; when invoked from a directory without a manifest it falls back to mcporter’s own version string, so `generate-cli` works even when you call it via `npx` in an empty folder.
 
 ## [0.3.1] - 2025-11-07
 
