@@ -5,6 +5,7 @@ import { type EphemeralServerSpec, persistEphemeralServer, resolveEphemeralServe
 import { CliUsageError } from './cli/errors.js';
 import { inferCommandRouting } from './cli/command-inference.js';
 import { extractEphemeralServerFlags } from './cli/ephemeral-flags.js';
+import { findServerByHttpUrl } from './cli/server-lookup.js';
 import { extractGeneratorFlags } from './cli/generate/flag-parser.js';
 import { handleEmitTs } from './cli/emit-ts-command.js';
 import { handleList } from './cli/list-command.js';
@@ -733,9 +734,14 @@ export async function handleAuth(runtime: Awaited<ReturnType<typeof createRuntim
   }
   let ephemeralSpec: EphemeralServerSpec | undefined = extractEphemeralServerFlags(args);
   let target = args.shift();
-  if (!ephemeralSpec && target && looksLikeHttpUrl(target)) {
-    ephemeralSpec = { httpUrl: target };
-    target = undefined;
+  if (target && looksLikeHttpUrl(target)) {
+    const reused = findServerByHttpUrl(runtime.getDefinitions(), target);
+    if (reused) {
+      target = reused;
+    } else if (!ephemeralSpec) {
+      ephemeralSpec = { httpUrl: target };
+      target = undefined;
+    }
   }
 
   if (ephemeralSpec && target && !looksLikeHttpUrl(target)) {

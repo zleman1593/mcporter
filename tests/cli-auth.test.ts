@@ -43,4 +43,24 @@ describe('mcporter auth ad-hoc support', () => {
 
     expect(listTools).toHaveBeenCalledWith('mcp-supabase-com-mcp', { autoAuthorize: true });
   });
+
+  it('reuses configured servers when auth target is a URL', async () => {
+    const { handleAuth } = await cliModulePromise;
+    const definition = {
+      name: 'vercel',
+      command: { kind: 'http', url: new URL('https://mcp.vercel.com') },
+      tokenCacheDir: '/tmp/cache',
+    } as ServerDefinition;
+    const runtime = {
+      getDefinitions: () => [definition],
+      registerDefinition: vi.fn(),
+      listTools: vi.fn().mockResolvedValue([{ name: 'ok' }]),
+      getDefinition: () => definition,
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    await handleAuth(runtime, ['https://mcp.vercel.com']);
+
+    expect(runtime.listTools).toHaveBeenCalledWith('vercel', { autoAuthorize: true });
+    expect(runtime.registerDefinition).not.toHaveBeenCalled();
+  });
 });

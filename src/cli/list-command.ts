@@ -7,6 +7,7 @@ import type { GeneratedOption } from './generate/tools.js';
 import type { ToolMetadata } from './generate/tools.js';
 import { chooseClosestIdentifier } from './identifier-helpers.js';
 import { buildToolDoc, formatExampleBlock } from './list-detail-helpers.js';
+import { findServerByHttpUrl } from './server-lookup.js';
 import { loadToolMetadata } from './tool-cache.js';
 import type { ListSummaryResult, StatusCategory } from './list-format.js';
 import { classifyListError, formatSourceSuffix, renderServerListRow } from './list-format.js';
@@ -66,9 +67,14 @@ export async function handleList(
   let target = args.shift();
   let ephemeralResolution: ReturnType<typeof resolveEphemeralServer> | undefined;
 
-  if (!flags.ephemeral && target && /^https?:\/\//i.test(target)) {
-    flags.ephemeral = { httpUrl: target };
-    target = undefined;
+  if (target && /^https?:\/\//i.test(target)) {
+    const reused = findServerByHttpUrl(runtime.getDefinitions(), target);
+    if (reused) {
+      target = reused;
+    } else if (!flags.ephemeral) {
+      flags.ephemeral = { httpUrl: target };
+      target = undefined;
+    }
   }
 
   if (flags.ephemeral) {

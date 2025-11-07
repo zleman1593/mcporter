@@ -294,6 +294,27 @@ describe('CLI list classification', () => {
     logSpy.mockRestore();
   });
 
+  it('reuses configured servers when listing by URL', async () => {
+    const { handleList } = await cliModulePromise;
+    const definition: ServerDefinition = {
+      name: 'vercel',
+      description: 'Vercel MCP',
+      command: { kind: 'http', url: new URL('https://mcp.vercel.com') },
+      source: { kind: 'local', path: '/tmp/config.json' },
+    };
+    const runtime = {
+      getDefinitions: () => [definition],
+      registerDefinition: vi.fn(),
+      getDefinition: () => definition,
+      listTools: vi.fn().mockResolvedValue([{ name: 'ok' }]),
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    await handleList(runtime, ['https://mcp.vercel.com']);
+
+    expect(runtime.listTools).toHaveBeenCalledWith('vercel', expect.anything());
+    expect(runtime.registerDefinition).not.toHaveBeenCalled();
+  });
+
   it('summarizes hidden optional parameters and hints include flag', async () => {
     const { handleList } = await cliModulePromise;
     const listToolsSpy = vi.fn((_name: string, options?: { includeSchema?: boolean }) =>

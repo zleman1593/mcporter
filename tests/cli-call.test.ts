@@ -259,6 +259,26 @@ describe('CLI call argument parsing', () => {
     });
   });
 
+  it('reuses configured servers when targeting an HTTP URL', async () => {
+    const { handleCall } = await cliModulePromise;
+    const definition: ServerDefinition = {
+      name: 'vercel',
+      command: { kind: 'http', url: new URL('https://mcp.vercel.com') },
+      source: { kind: 'local', path: '/tmp/config.json' },
+    } as ServerDefinition;
+    const runtime = {
+      getDefinitions: () => [definition],
+      registerDefinition: vi.fn(),
+      callTool: vi.fn().mockResolvedValue({ ok: true }),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Awaited<ReturnType<typeof import('../src/runtime.js')['createRuntime']>>;
+
+    await handleCall(runtime, ['--server', 'https://mcp.vercel.com', '--tool', 'list_projects']);
+
+    expect(runtime.callTool).toHaveBeenCalledWith('vercel', 'list_projects', { args: {} });
+    expect(runtime.registerDefinition).not.toHaveBeenCalled();
+  });
+
   it('errors when too many positional arguments are supplied', async () => {
     const { handleCall } = await cliModulePromise;
     const callTool = vi.fn();
@@ -307,6 +327,7 @@ describe('CLI call argument parsing', () => {
     });
     const callTool = vi.fn().mockResolvedValue({ ok: true });
     const runtime = {
+      getDefinitions: () => Array.from(definitions.values()),
       registerDefinition,
       callTool,
       close: vi.fn().mockResolvedValue(undefined),

@@ -8,6 +8,7 @@ import { chooseClosestIdentifier, normalizeIdentifier } from './identifier-helpe
 import { extractEphemeralServerFlags } from './ephemeral-flags.js';
 import { type OutputFormat, printCallOutput, tailLogIfRequested } from './output-utils.js';
 import { dumpActiveHandles } from './runtime-debug.js';
+import { findServerByHttpUrl } from './server-lookup.js';
 import { dimText } from './terminal.js';
 import { resolveCallTimeout, withTimeout } from './timeouts.js';
 
@@ -240,6 +241,17 @@ export async function handleCall(
     if (candidate) {
       ephemeralSpec = { ...ephemeralSpec, name: candidate };
       parsed.selector = undefined;
+    }
+  }
+
+  if (ephemeralSpec?.httpUrl) {
+    const reused = findServerByHttpUrl(runtime.getDefinitions(), ephemeralSpec.httpUrl);
+    if (reused) {
+      parsed.server = reused;
+      if (!parsed.selector) {
+        parsed.selector = reused;
+      }
+      ephemeralSpec = undefined;
     }
   }
 

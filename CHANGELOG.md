@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- CLI ergonomics received a major polish: `mcporter list` now streams spinner updates, renders TypeScript-style signatures (shared with generated CLIs), and prints inline call examples. Command inference auto-detects `list`/`call`/`auth`, the new function-call parser supports unlabeled positional arguments, and colon-delimited flags (`key:value`) are accepted alongside `key=value`.
+- Ad-hoc workflows are safer—`--http-url` / bare URLs auto-register temporary servers, but we now reuse existing definitions (and their OAuth tokens/redirect URIs) when the URL matches a configured entry such as Vercel. `mcporter auth <url>` piggybacks on the same logic, writes persisted entries, and retries once if a server flips into OAuth mode mid-flight.
+- OAuth detection was hardened: ad-hoc HTTP servers that return 401/403 are automatically promoted to `auth: "oauth"`, and we broadened the unauthorized heuristic so Supabase/Vercel/GitHub style responses trigger the retry. Known provider limitations (Supabase scope lock-down, GitHub/Vercel dynamic registration) are documented in `docs/known-issues.md` and `docs/supabase-auth-issue.md`.
+- Added `docs/tool-calling.md` and refreshed README/spec sections so every call style (flags, function expressions, shorthand) is documented, plus new unit tests that mirror the CLI behavior.
+
 - Swapped the `--required-only` / `--include-optional` pair for a single `--all-parameters` flag, updated the CLI hinting copy, and documented the new workflow across README/spec/call-syntax.
 - Refined single-server output: doc blocks insert a blank line before `@param`, long sentences wrap to 100 characters, the server summary line prints after the tool details, and color tinting now keeps `function` keywords grey while parameter labels highlight the `@param` and name.
 - `Examples:` now shows a single, ellipsized `mcporter call …` entry (unless the call already fits in ~80 characters) so verbose argument lists don't dominate the output.
