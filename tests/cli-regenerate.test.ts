@@ -127,6 +127,10 @@ describe('inspect/generate CLI artifacts', () => {
 
     expect(generateCliMock).toHaveBeenCalledTimes(1);
     const invocation = generateCliMock.mock.calls[0]?.[0];
+    expect(invocation).toBeDefined();
+    if (!invocation) {
+      throw new Error('generateCli was not invoked with options');
+    }
     expect(invocation.serverRef).toBe(
       JSON.stringify({
         name: 'shadcn',
