@@ -1,0 +1,88 @@
+import { describe, expect, it, vi } from 'vitest';
+import { buildToolMetadata } from '../src/cli/generate/tools.js';
+import type { ListSummaryResult } from '../src/cli/list-format.js';
+import {
+  buildAuthCommandHint,
+  buildJsonListEntry,
+  createEmptyStatusCounts,
+  printSingleServerHeader,
+  printToolDetail,
+} from '../src/cli/list-output.js';
+import type { ServerDefinition } from '../src/config.js';
+import type { ServerToolInfo } from '../src/runtime.js';
+
+describe('list output helpers', () => {
+  const definition: ServerDefinition = {
+    name: 'demo',
+    description: 'Demo server',
+    command: { kind: 'http', url: new URL('https://demo.example.com/mcp') },
+    source: { kind: 'local', path: '/tmp/mcporter.json' },
+  };
+
+  it('renders single server headers with tool counts and transport info', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const summary = printSingleServerHeader(definition, 2, 42, 'HTTP https://demo.example.com/mcp', 'config/demo');
+    expect(summary).toContain('2 tools');
+    expect(summary).toContain('42ms');
+    expect(summary).toContain('HTTP https://demo.example.com/mcp');
+    logSpy.mockRestore();
+  });
+
+  it('prints tool details and indicates optional fields', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const tool: ServerToolInfo = {
+      name: 'add',
+      description: 'Add numbers',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          a: { type: 'number', description: 'First operand' },
+          b: { type: 'number', description: 'Second operand' },
+          format: { type: 'string', enum: ['json', 'markdown'], description: 'Format' },
+          projectId: { type: 'string', description: 'Project context' },
+          initiativeId: { type: 'string', description: 'Initiative context' },
+          creatorId: { type: 'string', description: 'Creator filter' },
+        },
+        required: ['a', 'b'],
+      },
+      outputSchema: { type: 'number' },
+    };
+    const metadata = buildToolMetadata(tool);
+    const detail = printToolDetail('demo', metadata, true, true);
+    expect(detail.optionalOmitted).toBe(true);
+    expect(detail.examples.length).toBeGreaterThan(0);
+    logSpy.mockRestore();
+  });
+
+  it('builds JSON summaries for successful servers', () => {
+    const summary: ListSummaryResult = {
+      status: 'ok',
+      server: definition,
+      durationMs: 12,
+      tools: [
+        { name: 'add', description: 'Add numbers', inputSchema: { type: 'object' }, outputSchema: { type: 'number' } },
+      ],
+    };
+    const entry = buildJsonListEntry(summary, 30, { includeSchemas: true });
+    expect(entry.status).toBe('ok');
+    expect(entry.tools?.[0]?.name).toBe('add');
+    expect(entry.tools?.[0]?.inputSchema).toBeDefined();
+  });
+
+  it('includes auth hints for error summaries', () => {
+    const summary: ListSummaryResult = {
+      status: 'error',
+      server: definition,
+      durationMs: 1000,
+      error: new Error('HTTP error 401'),
+    };
+    const entry = buildJsonListEntry(summary, 5, { includeSchemas: false });
+    expect(entry.status).toBe('auth');
+    expect(entry.authCommand).toBe(buildAuthCommandHint(definition));
+  });
+
+  it('creates empty status counts with zeroed categories', () => {
+    const counts = createEmptyStatusCounts();
+    expect(counts).toEqual({ ok: 0, auth: 0, offline: 0, http: 0, error: 0 });
+  });
+});
