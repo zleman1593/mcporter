@@ -24,6 +24,10 @@ If you are unsure about sth, just google it.
 - Never call `git add` / `git commit` directly. To create a commit, list the exact paths via `./scripts/committer "type: summary" path/to/file1 path/to/file2`.
 - If you need to run the Bun-based git policy helper directly, you can use `./git ...`, but prefer `./runner git ...` so logging stays uniform.
 
+## Agent Scripts Mirror
+- The guardrail helpers (`runner`, `scripts/runner.ts`, `scripts/committer`, `bin/git`, `scripts/git-policy.ts`, `scripts/docs-list.ts`, etc.) are mirrored in `~/Projects/agent-scripts`. Any time you edit one of these files here, immediately copy the same change into the mirror (and vice versa) before moving on so the two repos stay byte-for-byte identical.
+- When the user says “sync agent scripts,” jump to `~/Projects/agent-scripts`, update it (respecting the git guardrails), diff against this repo, and reconcile changes in both directions. Keep syncing until both repos are clean and committed.
+
 ## Coding Style & Naming Conventions
 - TypeScript files use 2-space indentation, modern ES module syntax, and `strict` compiler settings.
 - Imports stay sorted logically; prefer relative paths within `src/`.
