@@ -1,6 +1,6 @@
 {
   "name": "mcporter",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "TypeScript runtime and CLI for connecting to configured Model Context Protocol servers.",
   "type": "module",
   "main": "dist/index.js",
@@ -20,6 +20,7 @@
     "mcporter": "./dist/cli.js"
   },
   "scripts": {
+    "mcporter": "tsx src/cli.ts",
     "build": "tsc -p tsconfig.build.json",
     "build:bun": "bun scripts/build-bun.ts",
     "check": "pnpm lint:biome && pnpm lint:oxlint && pnpm typecheck",
