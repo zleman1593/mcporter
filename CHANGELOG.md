@@ -3,16 +3,15 @@
 ## [Unreleased]
 
 ### CLI & runtime
-- Added a per-login daemon that auto-starts when keep-alive MCP servers (e.g., Chrome DevTools, Mobile MCP, Playwright) are invoked. The daemon keeps STDIO transports alive across agents, exposes `mcporter daemon <start|status|stop>`, and supports idle shutdown plus manual restarts.
-- Keep-alive detection now honors the `lifecycle` config flag/env overrides and also inspects STDIO command signatures, so renaming `chrome-devtools` (or other stateful servers) no longer disables the daemon accidentally.
-- Windows imports now probe workspace `.cursor/mcp.json`, `%USERPROFILE%\\.cursor\\mcp.json`, `%APPDATA%\\Cursor\\User\\mcp.json`, `.vscode/mcp.json`, and the current Windsurf/Codeium directories so editor-managed MCP servers show up without manual copies on Windows machines.
-- Implemented Windows process-tree enumeration/termination (via `powershell.exe Get-CimInstance Win32_Process`) so closing stdio transports tears down the full process tree on Windows just like macOS/Linux, preventing orphaned child servers.
+- _Nothing yet._
 
 ## [0.5.0] - 2025-11-10
 
 ### CLI & runtime
-- Fixed `createKeepAliveRuntime` so the daemon wrapper’s `listTools` method matches the base `Runtime` signature; `pnpm build` (and any command that shells out to `pnpm build`) succeeds again.
+- **Daemonized keep-alive servers.** A new per-login daemon automatically spins up whenever keep-alive MCP servers (Chrome DevTools, Mobile MCP, Playwright, etc.) are invoked. It keeps STDIO transports warm across agents, exposes `mcporter daemon <start|status|stop>`, supports idle shutdowns/manual restarts, and respects the `lifecycle` config flag plus STDIO command metadata so renamed servers stay eligible.
+- Fixed `createKeepAliveRuntime` so the daemon wrapper’s `listTools` implementation matches the base `Runtime` signature; `pnpm build` (and any command that shells out to `pnpm build`) succeeds again.
 - Cursor imports now cover both workspace and user `.cursor/mcp.json` files plus the platform-specific `Cursor/User/mcp.json` directories, and the VS Code/Windsurf walkers dedupe paths so editor-managed MCP servers are auto-discovered consistently across macOS, Linux, and Windows.
+- Windows installs now enumerate `.cursor/mcp.json`, `%USERPROFILE%\\.cursor\\mcp.json`, `%APPDATA%\\Cursor\\User\\mcp.json`, `.vscode/mcp.json`, and the Windsurf/Codeium directories automatically, while STDIO transports on Windows tear down entire process trees via `powershell.exe Get-CimInstance Win32_Process` to avoid orphaned child servers.
 
 ### Code generation
 - Bundled CLIs now stage `jsonc-parser` alongside `commander`/`mcporter`, preventing `Cannot find module './impl/format'` errors when `generate-cli --bundle` runs inside temporary or dependency-less directories.
