@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### CLI & runtime
+- _Nothing yet._
+
+## [0.5.3] - 2025-11-10
+
+### CLI & runtime
 - Fixed Claude imports so `mcporter list` merges project-scoped servers from `.claude.json` (matching the current workspace) and ignores metadata-only keys like `tipsHistory`/`cachedStatsigGates`, resolving GitHub issues #6 and #7.
 - OpenCode imports now read only the documented `mcp` container (no root-level fallback), matching the current OpenCode schema and preventing stray metadata from being misinterpreted as servers.
 
