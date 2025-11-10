@@ -9,88 +9,92 @@ import { z } from 'zod';
 import { readCliMetadata } from '../src/cli-metadata.js';
 import { generateCli, __test as generateCliInternals } from '../src/generate-cli.js';
 
+const describeGenerateCli = process.platform === 'win32' ? describe.skip : describe;
+
 let baseUrl: URL;
 const tmpDir = path.join(process.cwd(), 'tmp', 'mcporter-cli-tests');
 
-beforeAll(async () => {
-  await fs.rm(tmpDir, { recursive: true, force: true });
-  await fs.mkdir(tmpDir, { recursive: true });
-  const app = express();
-  app.use(express.json());
+if (process.platform !== 'win32') {
+  beforeAll(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+    await fs.mkdir(tmpDir, { recursive: true });
+    const app = express();
+    app.use(express.json());
 
-  const server = new McpServer({ name: 'integration', version: '1.0.0' });
-  server.registerTool(
-    'add',
-    {
-      title: 'Add',
-      description: 'Add two numbers',
-      inputSchema: { a: z.number(), b: z.number() },
-      outputSchema: { result: z.number() },
-    },
-    async ({ a, b }) => {
-      const result = { result: Number(a) + Number(b) };
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result) }],
-        structuredContent: result,
-      };
-    }
-  );
-  server.registerTool(
-    'list_comments',
-    {
-      title: 'List Comments',
-      description: 'List comments for an issue',
-      inputSchema: { issueId: z.string() },
-      outputSchema: { comments: z.array(z.string()) },
-    },
-    async ({ issueId }) => {
-      const result = { comments: [`Comment for ${issueId}`] };
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result) }],
-        structuredContent: result,
-      };
-    }
-  );
-  server.registerResource(
-    'greeting',
-    new ResourceTemplate('greeting://{name}', { list: undefined }),
-    { title: 'Greeting', description: 'Simple greeting' },
-    async (uri, { name }) => ({
-      contents: [
-        {
-          uri: uri.href,
-          text: `Hello, ${typeof name === 'string' ? name : 'friend'}!`,
-        },
-      ],
-    })
-  );
+    const server = new McpServer({ name: 'integration', version: '1.0.0' });
+    server.registerTool(
+      'add',
+      {
+        title: 'Add',
+        description: 'Add two numbers',
+        inputSchema: { a: z.number(), b: z.number() },
+        outputSchema: { result: z.number() },
+      },
+      async ({ a, b }) => {
+        const result = { result: Number(a) + Number(b) };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+          structuredContent: result,
+        };
+      }
+    );
+    server.registerTool(
+      'list_comments',
+      {
+        title: 'List Comments',
+        description: 'List comments for an issue',
+        inputSchema: { issueId: z.string() },
+        outputSchema: { comments: z.array(z.string()) },
+      },
+      async ({ issueId }) => {
+        const result = { comments: [`Comment for ${issueId}`] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+          structuredContent: result,
+        };
+      }
+    );
+    server.registerResource(
+      'greeting',
+      new ResourceTemplate('greeting://{name}', { list: undefined }),
+      { title: 'Greeting', description: 'Simple greeting' },
+      async (uri, { name }) => ({
+        contents: [
+          {
+            uri: uri.href,
+            text: `Hello, ${typeof name === 'string' ? name : 'friend'}!`,
+          },
+        ],
+      })
+    );
 
-  app.post('/mcp', async (req, res) => {
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
+    app.post('/mcp', async (req, res) => {
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+      res.on('close', () => {
+        transport.close().catch(() => {});
+      });
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
     });
-    res.on('close', () => {
-      transport.close().catch(() => {});
+
+    const httpServer = createServer(app);
+    await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
+    const address = httpServer.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Failed to obtain test server address');
+    }
+    baseUrl = new URL(`http://127.0.0.1:${address.port}/mcp`);
+
+    afterAll(async () => {
+      await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     });
-    await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
   });
+}
 
-  const httpServer = createServer(app);
-  await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
-  const address = httpServer.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('Failed to obtain test server address');
-  }
-  baseUrl = new URL(`http://127.0.0.1:${address.port}/mcp`);
-
-  afterAll(async () => {
-    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-  });
-});
-
-describe('generateCli', () => {
+describeGenerateCli('generateCli', () => {
   it('creates a standalone CLI and bundled executable', async () => {
     const inline = JSON.stringify({
       name: 'integration',

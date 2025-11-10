@@ -11,6 +11,7 @@ const testRequire = createRequire(import.meta.url);
 const MCP_SERVER_MODULE = pathToFileURL(testRequire.resolve('@modelcontextprotocol/sdk/server/mcp.js')).href;
 const STDIO_SERVER_MODULE = pathToFileURL(testRequire.resolve('@modelcontextprotocol/sdk/server/stdio.js')).href;
 const ZOD_MODULE = pathToFileURL(testRequire.resolve('zod')).href;
+const describeDaemon = process.platform === 'win32' ? describe.skip : describe;
 
 async function ensureDistBuilt(): Promise<void> {
   try {
@@ -58,7 +59,7 @@ function parseCliJson(output: string): { instanceId: string; count: number } {
   return JSON.parse(trimmed.slice(start, end + 1));
 }
 
-describe('daemon keep-alive integration', () => {
+describeDaemon('daemon keep-alive integration', () => {
   it('reuses stdio servers across mcporter invocations', async () => {
     await ensureDistBuilt();
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcporter-daemon-e2e-'));
