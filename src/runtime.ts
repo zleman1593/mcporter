@@ -180,6 +180,8 @@ class McpRuntime implements Runtime {
         outputSchema: options.includeSchema ? tool.outputSchema : undefined,
       }));
     } catch (error) {
+      // Keep-alive STDIO transports often die when Chrome closes; drop the cached client
+      // so the next call spins up a fresh process instead of reusing the broken handle.
       await this.resetConnectionOnError(server, error);
       throw error;
     } finally {
@@ -206,6 +208,8 @@ class McpRuntime implements Runtime {
       }
       return await raceWithTimeout(resultPromise, timeoutMs);
     } catch (error) {
+      // Runtime timeouts and transport crashes should tear down the cached connection so
+      // the daemon (or direct runtime) can relaunch the MCP server on the next attempt.
       await this.resetConnectionOnError(server, error);
       throw error;
     }
@@ -217,6 +221,7 @@ class McpRuntime implements Runtime {
       const { client } = await this.connect(server);
       return await client.listResources(options as ListResourcesRequest['params']);
     } catch (error) {
+      // Fatal listResources errors usually mean the underlying transport has gone away.
       await this.resetConnectionOnError(server, error);
       throw error;
     }
@@ -292,6 +297,8 @@ class McpRuntime implements Runtime {
       return;
     }
     try {
+      // Reuse the existing close() helper so transport shutdown stays consistent with
+      // normal runtime disposal (wait for STDIO children, close OAuth sessions, etc.).
       await this.close(normalized);
     } catch (closeError) {
       const detail = closeError instanceof Error ? closeError.message : String(closeError);
@@ -545,7 +552,7 @@ function normalizeTimeout(raw?: number): number | undefined {
 function raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      // Reject with a Timeout error; the caller will decide whether the underlying transport should be reset.
+      // Reject with a Timeout error; higher-level catch blocks decide whether to recycle the transport.
       reject(new Error('Timeout'));
     }, timeoutMs);
     promise.then(

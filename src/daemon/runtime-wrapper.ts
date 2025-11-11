@@ -108,6 +108,8 @@ class KeepAliveRuntime implements Runtime {
       if (!shouldRestartDaemonServer(error)) {
         throw error;
       }
+      // The daemon keeps STDIO transports warm; if a call fails due to a fatal error,
+      // force-close the cached server so the retry launches a fresh Chrome instance.
       logDaemonRetry(server, operation, error);
       await this.daemon.closeServer({ server }).catch(() => {});
       return action();
