@@ -29,8 +29,45 @@ interface ProcessStreamMeta {
 
 const PROCESS_BUFFERS = new WeakMap<MaybeChildProcess, ProcessStreamMeta>();
 const TRANSPORT_BUFFERS = new WeakMap<object, ProcessStreamMeta>();
-const STDIO_LOGS_ENABLED = process.env.MCPORTER_STDIO_LOGS === '1';
+const STDIO_LOGS_FORCED = process.env.MCPORTER_STDIO_LOGS === '1';
 const STDIO_TRACE_ENABLED = process.env.MCPORTER_STDIO_TRACE === '1';
+
+export type StdioLogMode = 'auto' | 'always' | 'silent';
+
+let stdioLogMode: StdioLogMode = STDIO_LOGS_FORCED ? 'always' : 'auto';
+
+export function getStdioLogMode(): StdioLogMode {
+  return stdioLogMode;
+}
+
+export function setStdioLogMode(mode: StdioLogMode): StdioLogMode {
+  const previous = stdioLogMode;
+  if (!STDIO_LOGS_FORCED) {
+    stdioLogMode = mode;
+  }
+  return previous;
+}
+
+export function evaluateStdioLogPolicy(
+  mode: StdioLogMode,
+  hasStderr: boolean,
+  exitCode: number | null | undefined
+): boolean {
+  if (!hasStderr) {
+    return false;
+  }
+  if (mode === 'silent') {
+    return false;
+  }
+  if (mode === 'always') {
+    return true;
+  }
+  return typeof exitCode === 'number' && exitCode !== 0;
+}
+
+function shouldPrintStdioLogs(meta: ProcessStreamMeta): boolean {
+  return evaluateStdioLogPolicy(stdioLogMode, meta.stderrChunks.length > 0, meta.code);
+}
 
 if (STDIO_TRACE_ENABLED) {
   console.log('[mcporter] STDIO trace logging enabled (set MCPORTER_STDIO_TRACE=0 to disable).');
@@ -156,8 +193,7 @@ function flushProcessLogs(_child: MaybeChildProcess, meta: ProcessStreamMeta): v
   }
   meta.listeners.length = 0;
 
-  const shouldPrint = STDIO_LOGS_ENABLED || (typeof meta.code === 'number' && meta.code !== 0);
-  if (shouldPrint && meta.stderrChunks.length > 0) {
+  if (shouldPrintStdioLogs(meta)) {
     const heading = meta.command ? `[mcporter] stderr from ${meta.command}` : '[mcporter] stderr from stdio server';
     console.log(heading);
     process.stdout.write(meta.stderrChunks.join(''));
