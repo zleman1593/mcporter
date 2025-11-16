@@ -77,17 +77,21 @@ export function renderTemplate({
       flagExtras: [{ text: '--raw <json>' }],
     }),
   }));
-  const toolHelp = toolDocs.map(({ tool, doc }) => ({
-    name: tool.tool.name,
-    description: tool.tool.description ?? '',
-    usage: doc.flagUsage ? `${tool.tool.name} ${doc.flagUsage}` : undefined,
-    flags: doc.flagUsage ?? '',
+  const renderedTools = toolDocs.map((entry) => ({
+    ...renderToolCommand(entry.tool, timeoutMs, serverName, entry.doc),
+    doc: entry.doc,
+    tool: entry.tool,
+  }));
+  const toolHelp = renderedTools.map((entry) => ({
+    name: entry.commandName,
+    description: entry.tool.tool.description ?? '',
+    usage: entry.doc.flagUsage ? `${entry.commandName} ${entry.doc.flagUsage}` : undefined,
+    flags: entry.doc.flagUsage ?? '',
   }));
   const generatorHeaderLiteral = JSON.stringify(generatorHeader);
   const toolHelpLiteral = JSON.stringify(toolHelp, undefined, 2);
   const embeddedSchemas = JSON.stringify(buildEmbeddedSchemaMap(tools), undefined, 2);
   const embeddedMetadata = JSON.stringify(metadata, undefined, 2);
-  const renderedTools = toolDocs.map((entry) => renderToolCommand(entry.tool, timeoutMs, serverName, entry.doc));
   const toolBlocks = renderedTools.map((entry) => entry.block).join('\n\n');
   const signatureMap = Object.fromEntries(renderedTools.map((entry) => [entry.commandName, entry.tsSignature]));
   const signatureMapLiteral = JSON.stringify(signatureMap, undefined, 2);
@@ -426,14 +430,14 @@ export function renderToolCommand(
   const optionalSnippet = doc.optionalSummary
     ? `\n\t.addHelpText('afterAll', () => '\\n' + ${JSON.stringify(doc.optionalSummary)} + '\\n')`
     : '';
+  const aliasSnippet = tool.tool.name !== commandName ? `\n\t.alias(${JSON.stringify(tool.tool.name)})` : '';
   const block = `program
 \t.command(${JSON.stringify(commandName)})
 \t.summary(${JSON.stringify(summary)})
 \t.description(${JSON.stringify(description)})
-\t.description(${JSON.stringify(description)})
 ${usageSnippet ? `\t${usageSnippet}` : ''}\t.option('--raw <json>', 'Provide raw JSON arguments to the tool, bypassing flag parsing.')
 ${optionLines ? `\n${optionLines}` : ''}
-\t.action(async (cmdOpts) => {
+${aliasSnippet ? `\t${aliasSnippet}` : ''}\t.action(async (cmdOpts) => {
 \t\tconst globalOptions = program.opts();
 \t\tconst runtime = await ensureRuntime();
 \t\tconst serverName = embeddedName;

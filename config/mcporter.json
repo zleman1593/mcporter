@@ -26,6 +26,10 @@
       "description": "Context7 MCP for React documentation lookup.",
       "baseUrl": "https://mcp.context7.com/mcp"
     },
+    "deepwiki": {
+      "description": "DeepWiki MCP server for querying public code/docs without local checkout.",
+      "baseUrl": "https://mcp.deepwiki.com/mcp"
+    },
     "linear": {
       "description": "Hosted Linear MCP; exposes issue search, create, and workflow tooling.",
       "baseUrl": "https://mcp.linear.app/mcp",
