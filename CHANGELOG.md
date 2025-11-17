@@ -11,6 +11,9 @@ _No changes yet._
 - JSON list payloads include a new `sources` array when `--verbose` is set, mirroring the on-screen path list for programmatic consumers.
 - Verbose source listings now tag the import kind (cursor/vscode/codex, etc.) and explicitly label the primary entry vs. shadowed duplicates.
 
+### Runtime
+- Propagate `--timeout` / `MCPORTER_CALL_TIMEOUT` into MCP tool calls (SDK `timeout`, `resetTimeoutOnProgress`, `maxTotalTimeout`) so long GPT‑5 Pro runs no longer hit the 60s default request timeout.
+
 ## [0.6.0] - 2025-11-16
 
 ### Configuration

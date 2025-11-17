@@ -238,8 +238,15 @@ class McpRuntime implements Runtime {
         name: toolName,
         arguments: options.args ?? {},
       };
-      const resultPromise = client.callTool(params);
+      // Forward the requested timeout to the MCP client so server-side requests don't hit the SDK's
+      // default 60s cap. Keep our own outer race as a second guard.
       const timeoutMs = normalizeTimeout(options.timeoutMs);
+      const resultPromise = client.callTool(params, undefined, {
+        timeout: timeoutMs,
+        // Long runs (e.g., GPT-5 Pro) emit progress/logging; allow that to refresh the timer.
+        resetTimeoutOnProgress: true,
+        maxTotalTimeout: timeoutMs,
+      });
       if (!timeoutMs) {
         return await resultPromise;
       }
