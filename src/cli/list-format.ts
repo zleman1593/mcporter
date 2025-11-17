@@ -23,7 +23,8 @@ export type ListSummaryResult =
 
 export function renderServerListRow(
   result: ListSummaryResult,
-  timeoutMs: number
+  timeoutMs: number,
+  options: { verbose?: boolean } = {}
 ): {
   line: string;
   summary: string;
@@ -33,7 +34,9 @@ export function renderServerListRow(
 } {
   const description = result.server.description ? dimText(` — ${result.server.description}`) : '';
   const durationLabel = dimText(`${(result.durationMs / 1000).toFixed(1)}s`);
-  const sourceSuffix = formatSourceSuffix(result.server.source);
+  const sourceSuffix = formatSourceSuffix(result.server.sources ?? result.server.source, false, {
+    verbose: options.verbose,
+  });
   const prefix = `- ${result.server.name}${description}`;
 
   if (result.status === 'ok') {
@@ -66,13 +69,29 @@ export function truncateForSpinner(text: string, maxLength = 72): string {
   return `${text.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
-export function formatSourceSuffix(source: ServerSource | undefined, inline = false): string {
-  if (!source || source.kind !== 'import') {
+export function formatSourceSuffix(
+  sourceOrSources: ServerSource | readonly ServerSource[] | undefined,
+  inline = false,
+  options: { verbose?: boolean } = {}
+): string {
+  const sources = Array.isArray(sourceOrSources) ? [...sourceOrSources] : sourceOrSources ? [sourceOrSources] : [];
+  if (sources.length === 0) {
     return '';
   }
-  const formatted = formatPathForDisplay(source.path);
-  const text = inline ? formatted : `[source: ${formatted}]`;
-  const tinted = extraDimText(text);
+  const verbose = options.verbose ?? false;
+  if (!verbose) {
+    const primary = sources[0];
+    if (primary.kind !== 'import') {
+      return '';
+    }
+    const formatted = formatPathForDisplay(primary.path);
+    const tinted = extraDimText(inline ? formatted : `[source: ${formatted}]`);
+    return inline ? tinted : ` ${tinted}`;
+  }
+  // When verbose, show every contributing source (primary first) so duplicates are discoverable.
+  const formatted = sources.map((entry) => formatPathForDisplay(entry.path));
+  const label = sources.length === 1 ? `source: ${formatted[0]}` : `sources: ${formatted.join(' · ')}`;
+  const tinted = extraDimText(inline ? label : `[${label}]`);
   return inline ? tinted : ` ${tinted}`;
 }
 

@@ -123,6 +123,7 @@ export interface ServerDefinition {
   readonly clientName?: string;
   readonly oauthRedirectUrl?: string;
   readonly source?: ServerSource;
+  readonly sources?: readonly ServerSource[];
   readonly lifecycle?: ServerLifecycle;
   readonly logging?: ServerLoggingOptions;
 }

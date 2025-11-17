@@ -4,6 +4,12 @@
 
 _No changes yet._
 
+## [0.6.1] - 2025-11-17
+
+### CLI
+- `mcporter list --verbose` now surfaces every config path that registers the target server (primary first, then duplicates) in both text and JSON output, making it easier to trace where a name is coming from.
+- JSON list payloads include a new `sources` array when `--verbose` is set, mirroring the on-screen path list for programmatic consumers.
+
 ## [0.6.0] - 2025-11-16
 
 ### Configuration

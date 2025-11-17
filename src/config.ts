@@ -35,7 +35,7 @@ export async function loadServerDefinitions(options: LoadConfigOptions = {}): Pr
   const rootDir = options.rootDir ?? process.cwd();
   const layers = await loadConfigLayers(options, rootDir);
 
-  const merged = new Map<string, { raw: RawEntry; baseDir: string; source: ServerSource }>();
+  const merged = new Map<string, { raw: RawEntry; baseDir: string; source: ServerSource; sources: ServerSource[] }>();
 
   for (const layer of layers) {
     const configuredImports = layer.config.imports;
@@ -57,27 +57,45 @@ export async function loadServerDefinitions(options: LoadConfigOptions = {}): Pr
           if (merged.has(name)) {
             continue;
           }
+          const source: ServerSource = { kind: 'import', path: resolved };
+          const existing = merged.get(name);
+          // Keep the first-seen source as canonical while tracking all alternates
+          if (existing) {
+            existing.sources.push(source);
+            continue;
+          }
           merged.set(name, {
             raw: rawEntry,
             baseDir: path.dirname(resolved),
-            source: { kind: 'import', path: resolved },
+            source,
+            sources: [source],
           });
         }
       }
     }
 
     for (const [name, entryRaw] of Object.entries(layer.config.mcpServers)) {
+      const source: ServerSource = { kind: 'local', path: layer.path };
+      const parsed = RawEntrySchema.parse(entryRaw);
+      const existing = merged.get(name);
+      // Local definitions win; stash any prior imports after the local path
+      if (existing) {
+        const sources = [source, ...existing.sources];
+        merged.set(name, { raw: parsed, baseDir: path.dirname(layer.path), source, sources });
+        continue;
+      }
       merged.set(name, {
-        raw: RawEntrySchema.parse(entryRaw),
+        raw: parsed,
         baseDir: path.dirname(layer.path),
-        source: { kind: 'local', path: layer.path },
+        source,
+        sources: [source],
       });
     }
   }
 
   const servers: ServerDefinition[] = [];
-  for (const [name, { raw, baseDir: entryBaseDir, source }] of merged) {
-    servers.push(normalizeServerEntry(name, raw, entryBaseDir, source));
+  for (const [name, { raw, baseDir: entryBaseDir, source, sources }] of merged) {
+    servers.push(normalizeServerEntry(name, raw, entryBaseDir, source, sources));
   }
 
   return servers;
