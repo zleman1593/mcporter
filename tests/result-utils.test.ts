@@ -102,6 +102,18 @@ describe('createCallResult markdown extraction', () => {
     const result = createCallResult(response);
     expect(result.markdown()).toBe('## Subtitle');
   });
+
+  it('extracts markdown from structuredContent nested inside raw wrapper', () => {
+    const response = {
+      raw: {
+        structuredContent: {
+          markdown: '_italic_',
+        },
+      },
+    };
+    const result = createCallResult(response);
+    expect(result.markdown()).toBe('_italic_');
+  });
 });
 
 describe('createCallResult json extraction', () => {
@@ -129,5 +141,53 @@ describe('createCallResult json extraction', () => {
     };
     const result = createCallResult(response);
     expect(result.json()).toEqual({ foo: 'bar' });
+  });
+
+  it('extracts json from structuredContent nested inside raw wrapper', () => {
+    const response = {
+      raw: {
+        structuredContent: {
+          json: { nested: true },
+        },
+      },
+    };
+    const result = createCallResult(response);
+    expect(result.json()).toEqual({ nested: true });
+  });
+});
+
+describe('createCallResult structured accessors', () => {
+  it('content() returns nested raw content array', () => {
+    const nested = [{ type: 'text', text: 'Hello' }];
+    const response = {
+      raw: {
+        content: nested,
+      },
+    };
+    const result = createCallResult(response);
+    expect(result.content()).toBe(nested);
+  });
+
+  it('structuredContent() returns nested raw structuredContent', () => {
+    const structured = { text: 'Inner text' };
+    const response = {
+      raw: {
+        structuredContent: structured,
+      },
+    };
+    const result = createCallResult(response);
+    expect(result.structuredContent()).toBe(structured);
+  });
+
+  it('text() falls back to structuredContent.text when no content exists', () => {
+    const response = {
+      raw: {
+        structuredContent: {
+          text: 'Structured fallback',
+        },
+      },
+    };
+    const result = createCallResult(response);
+    expect(result.text()).toBe('Structured fallback');
   });
 });
