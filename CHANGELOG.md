@@ -5,6 +5,12 @@
 ### Runtime
 - Propagate `--timeout` / `MCPORTER_CALL_TIMEOUT` into MCP tool calls (SDK `timeout`, `resetTimeoutOnProgress`, `maxTotalTimeout`) so long-running requests are no longer capped by the SDK’s 60s default.
 
+### CLI
+- `mcporter generate-cli` once again treats single-token `--command` values (e.g., `./scripts/server.ts`) as STDIO transports instead of trying to coerce them into HTTP URLs, restoring the pre-0.6.1 behavior for ad-hoc scripts.
+
+### Configuration
+- Reintroduced support for `OPENCODE_CONFIG_DIR` so OpenCode imports continue to honor the documented directory override alongside `OPENCODE_CONFIG`.
+
 ## [0.6.1] - 2025-11-17
 
 ### CLI
