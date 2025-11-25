@@ -401,6 +401,7 @@ CI runs the same trio via GitHub Actions.
 ## Related
 - CodexBar 🟦🟩 Keep Codex token windows visible in your macOS menu bar. <https://codexbar.app>.
 - Trimmy ✂️ “Paste once, run once.” Flatten multi-line shell snippets so they paste and run. <https://trimmy.app>.
+- Oracle 🧿 Prompt bundler/CLI for multi-model runs (GPT-5.1, Claude, Gemini). <https://github.com/steipete/oracle>.
 - MCP spec ✨ <https://github.com/modelcontextprotocol/specification>
 
 ## Debug Hanging Servers Quickly
