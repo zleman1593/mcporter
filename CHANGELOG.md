@@ -1,7 +1,8 @@
 # mcporter Changelog
 
 ## [Unreleased]
-- Nothing yet.
+### Security / Dependencies
+- Override transitive `body-parser` to 2.2.1 (CVE-2025-13466) via pnpm overrides.
 
 ## [0.6.4] - 2025-11-25
 ### CLI
