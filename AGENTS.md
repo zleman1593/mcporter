@@ -50,6 +50,7 @@ Usage: In repo copies, the shared content lives inside `<shared>…</shared>` an
 - Whenever doing a large refactor, track work in `docs/refactor/<title><date>.md`, update it as you go, and delete it when the work is finished.
 - Only create new documentation when the user or local instructions explicitly request it; otherwise, edit the canonical file in place.
 - When you uncover a reproducible tooling or CI issue, record the repro steps and workaround in the designated troubleshooting doc for that repo.
+- Routine test additions don’t require changelog entries; reserve changelog lines for user-visible behavior changes.
 
 ### Troubleshooting & Observability
 - Design workflows so they are observable without constant babysitting: use tmux panes, CI logs, log-tail scripts, MCP/browser helpers, and similar tooling to surface progress.

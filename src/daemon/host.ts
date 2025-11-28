@@ -19,6 +19,7 @@ interface DaemonHostOptions {
   readonly socketPath: string;
   readonly metadataPath: string;
   readonly configPath: string;
+  readonly configExplicit?: boolean;
   readonly rootDir?: string;
   readonly logPath?: string;
   readonly logServers?: Set<string>;
@@ -32,7 +33,7 @@ interface ServerActivity {
 
 export async function runDaemonHost(options: DaemonHostOptions): Promise<void> {
   const runtime = await createRuntime({
-    configPath: options.configPath,
+    configPath: options.configExplicit ? options.configPath : undefined,
     rootDir: options.rootDir,
   });
   const keepAliveDefinitions = runtime.getDefinitions().filter(isKeepAliveServer);

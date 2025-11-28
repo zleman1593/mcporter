@@ -4,6 +4,10 @@
 ### CLI
 - Nothing yet.
 
+## [0.6.6] - 2025-11-28
+### CLI
+- Prevented ENOENT crashes when no config file exists anywhere by only passing an explicit `--config`/`MCPORTER_CONFIG` path to the runtime; implicit defaults now fall back cleanly across list/config/daemon flows.
+
 ## [0.6.5] - 2025-11-26
 ### CLI
 - `mcporter call|auth|list help/--help` now print the command-specific usage text instead of attempting to run a server, matching the footer’s “mcporter <command> --help” hint.

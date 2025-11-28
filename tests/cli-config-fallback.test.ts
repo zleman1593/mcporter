@@ -238,4 +238,22 @@ describe('mcporter CLI with completely empty environment (ENOENT regression)', (
     logSpy.mockRestore();
     warnSpy.mockRestore();
   });
+
+  it('daemon start no-ops gracefully with no config files anywhere', async () => {
+    const { runCli } = await cliModulePromise;
+    const logs: string[] = [];
+    const logSpy = vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      if (typeof value === 'string') {
+        logs.push(value);
+      }
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(runCli(['daemon', 'start'])).resolves.not.toThrow();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(logs.join('\n')).toContain('No MCP servers are configured for keep-alive; daemon not started.');
+
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
 });

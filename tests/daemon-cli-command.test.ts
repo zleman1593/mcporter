@@ -83,15 +83,30 @@ describe('daemon CLI restart', () => {
       .mockResolvedValueOnce(null) // waitFor: daemon not ready yet
       .mockResolvedValueOnce({ pid: 420, socketPath: '/tmp/socket', servers: [], logPath: '/tmp/mock-daemon.log' });
 
-    await handleDaemonCli(['restart', '--log'], { configPath: '/tmp/config.json' });
+    await handleDaemonCli(['restart', '--log'], { configPath: '/tmp/config.json', configExplicit: true });
 
     expect(stopMock).toHaveBeenCalledTimes(1);
     expect(launchDaemonDetachedMock).toHaveBeenCalledWith({
       configPath: '/tmp/config.json',
+      configExplicit: true,
       rootDir: undefined,
       metadataPath: '/tmp/meta',
       socketPath: '/tmp/socket',
       extraArgs: ['--log-file', '/tmp/mock-daemon.log'],
+    });
+  });
+
+  it('uses implicit config when no explicit path is provided, avoiding ENOENT', async () => {
+    statusMock
+      .mockResolvedValueOnce(null) // restart wait sees daemon already stopped
+      .mockResolvedValueOnce(null) // handleDaemonStart: no existing daemon
+      .mockResolvedValueOnce({ pid: 321, socketPath: '/tmp/socket', servers: [], logPath: undefined }); // waitFor ready
+
+    await handleDaemonCli(['restart'], { configPath: '/tmp/config.json', configExplicit: false });
+
+    expect(createRuntimeMock).toHaveBeenCalledWith({
+      configPath: undefined,
+      rootDir: undefined,
     });
   });
 });

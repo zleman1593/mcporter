@@ -90,6 +90,7 @@ export async function runCli(argv: string[]): Promise<void> {
   if (command === 'daemon') {
     await handleDaemonCli(args, {
       configPath: configPathResolved,
+      configExplicit: configResolution.explicit,
       rootDir: rootOverride,
     });
     return;
@@ -124,7 +125,13 @@ export async function runCli(argv: string[]): Promise<void> {
       .map((entry) => entry.name)
   );
   const daemonClient =
-    keepAliveServers.size > 0 ? new DaemonClient({ configPath: configResolution.path, rootDir: rootOverride }) : null;
+    keepAliveServers.size > 0
+      ? new DaemonClient({
+          configPath: configResolution.path,
+          configExplicit: configResolution.explicit,
+          rootDir: rootOverride,
+        })
+      : null;
   const runtime = createKeepAliveRuntime(baseRuntime, { daemonClient, keepAliveServers });
 
   const inference = inferCommandRouting(command, args, runtime.getDefinitions());

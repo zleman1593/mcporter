@@ -3,6 +3,7 @@ import path from 'node:path';
 
 export interface DaemonLaunchOptions {
   readonly configPath: string;
+  readonly configExplicit?: boolean;
   readonly rootDir?: string;
   readonly socketPath: string;
   readonly metadataPath: string;
@@ -11,11 +12,11 @@ export interface DaemonLaunchOptions {
 
 export function launchDaemonDetached(options: DaemonLaunchOptions): void {
   const cliEntry = resolveCliEntry();
+  const configArgs = options.configExplicit ? ['--config', options.configPath] : [];
   const args = [
     ...process.execArgv,
     cliEntry,
-    '--config',
-    options.configPath,
+    ...configArgs,
     ...(options.rootDir ? ['--root', options.rootDir] : []),
     'daemon',
     'start',

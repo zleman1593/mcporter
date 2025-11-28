@@ -10,6 +10,9 @@ import { createRuntime } from '../runtime.js';
 
 interface DaemonCliOptions {
   readonly configPath: string;
+  // Whether the config path was explicitly provided (flag/env). If false, runtime should
+  // treat config as implicit and allow missing files without throwing ENOENT.
+  readonly configExplicit?: boolean;
   readonly rootDir?: string;
 }
 
@@ -29,6 +32,7 @@ export async function handleDaemonCli(args: string[], options: DaemonCliOptions)
 
   const client = new DaemonClient({
     configPath: options.configPath,
+    configExplicit: options.configExplicit,
     rootDir: options.rootDir,
   });
 
@@ -80,7 +84,7 @@ async function handleDaemonStart(args: string[], options: DaemonCliOptions, clie
   const logging = await resolveDaemonLoggingOptions(args, paths.key);
 
   const runtime = await createRuntime({
-    configPath: options.configPath,
+    configPath: options.configExplicit ? options.configPath : undefined,
     rootDir: options.rootDir,
   });
   const keepAlive = runtime.getDefinitions().filter(isKeepAliveServer);
@@ -95,6 +99,7 @@ async function handleDaemonStart(args: string[], options: DaemonCliOptions, clie
       socketPath,
       metadataPath,
       configPath: options.configPath,
+      configExplicit: options.configExplicit,
       rootDir: options.rootDir,
       logPath: logging.enabled ? logging.logPath : undefined,
       logServers: logging.serverFilter,
@@ -119,6 +124,7 @@ async function handleDaemonStart(args: string[], options: DaemonCliOptions, clie
 
   launchDaemonDetached({
     configPath: options.configPath,
+    configExplicit: options.configExplicit,
     rootDir: options.rootDir,
     metadataPath,
     socketPath,

@@ -16,6 +16,7 @@ import type {
 
 export interface DaemonClientOptions {
   readonly configPath: string;
+  readonly configExplicit?: boolean;
   readonly rootDir?: string;
 }
 
@@ -121,6 +122,7 @@ export class DaemonClient {
       .then(() => {
         launchDaemonDetached({
           configPath: this.options.configPath,
+          configExplicit: this.options.configExplicit,
           rootDir: this.options.rootDir,
           metadataPath: this.metadataPath,
           socketPath: this.socketPath,
