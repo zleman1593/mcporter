@@ -95,7 +95,9 @@ class PersistentOAuthClientProvider implements OAuthClientProvider {
     const server = http.createServer();
     const overrideRedirect = definition.oauthRedirectUrl ? new URL(definition.oauthRedirectUrl) : null;
     const listenHost = overrideRedirect?.hostname ?? CALLBACK_HOST;
-    const desiredPort = overrideRedirect?.port ? Number.parseInt(overrideRedirect.port, 10) : undefined;
+    const overridePort = overrideRedirect?.port ?? '';
+    const usesDynamicPort = !overrideRedirect || overridePort === '' || overridePort === '0';
+    const desiredPort = usesDynamicPort ? undefined : Number.parseInt(overridePort, 10);
     const callbackPath =
       overrideRedirect?.pathname && overrideRedirect.pathname !== '/' ? overrideRedirect.pathname : CALLBACK_PATH;
     const port = await new Promise<number>((resolve, reject) => {
@@ -113,7 +115,7 @@ class PersistentOAuthClientProvider implements OAuthClientProvider {
     const redirectUrl = overrideRedirect
       ? new URL(overrideRedirect.toString())
       : new URL(`http://${listenHost}:${port}${callbackPath}`);
-    if (!overrideRedirect || overrideRedirect.port === '') {
+    if (usesDynamicPort) {
       redirectUrl.port = String(port);
     }
     if (!overrideRedirect || overrideRedirect.pathname === '/' || overrideRedirect.pathname === '') {
@@ -136,14 +138,25 @@ class PersistentOAuthClientProvider implements OAuthClientProvider {
     server.on('request', async (req, res) => {
       try {
         const url = req.url ?? '';
-        if (!url.startsWith('/callback')) {
+        const parsed = new URL(url, this.redirectUrlValue);
+        const expectedPath = this.redirectUrlValue.pathname || '/callback';
+        if (parsed.pathname !== expectedPath) {
           res.statusCode = 404;
           res.end('Not found');
           return;
         }
-        const parsed = new URL(url, this.redirectUrlValue);
         const code = parsed.searchParams.get('code');
         const error = parsed.searchParams.get('error');
+        const receivedState = parsed.searchParams.get('state');
+        const expectedState = await this.persistence.readState();
+        if (expectedState && receivedState !== expectedState) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'text/html');
+          res.end('<html><body><h1>Authorization failed</h1><p>Invalid OAuth state</p></body></html>');
+          this.authorizationDeferred?.reject(new Error('Invalid OAuth state'));
+          this.authorizationDeferred = null;
+          return;
+        }
         if (code) {
           this.logger.info(`Received OAuth authorization code for ${this.definition.name}`);
           res.statusCode = 200;
